@@ -1,0 +1,28 @@
+@import 'tailwindcss';
+
+@theme {
+  /* Paleta "oscura medieval" de Lupus */
+  --color-night-950: #0b0d12;
+  --color-night-900: #12151d;
+  --color-night-800: #1b1f2a;
+  --color-night-700: #2a3040;
+  --color-parchment: #e8dcc4;
+  --color-blood: #9b1c1c;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-night-950);
+  color: var(--color-parchment);
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+}

@@ -1,0 +1,18 @@
+# ---- Node / web ----
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# ---- IDE ----
+.idea/
+.vscode/
+*.iml
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
+
+# ---- Secretos / entorno ----
+.env
+.env.*

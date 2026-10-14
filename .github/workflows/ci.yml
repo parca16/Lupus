@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  server:
+    name: Servidor (Java)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configurar JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Preparar Gradle
+        uses: gradle/actions/setup-gradle@v4
+      - name: Compilar y testear
+        run: |
+          chmod +x ./gradlew
+          ./gradlew build --no-daemon
+
+  web:
+    name: Cliente (React)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configurar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Instalar dependencias
+        run: npm ci
+      - name: Compilar
+        run: npm run build
+      - name: Testear
+        run: npm test
