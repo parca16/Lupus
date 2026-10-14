@@ -1,0 +1,7 @@
+plugins {
+	// Permite a Gradle descargar automáticamente el JDK 21 que pide el toolchain,
+	// sin que haya que instalarlo a mano.
+	id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
+}
+
+rootProject.name = 'lupus'
