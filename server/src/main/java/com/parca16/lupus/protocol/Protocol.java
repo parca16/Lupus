@@ -33,6 +33,16 @@ public final class Protocol {
 		return TYPES;
 	}
 
+	/** Vista minima del sobre, util para decidir como tratar un mensaje antes de deserializarlo. */
+	public record Envelope(int v, String type, String id) {
+	}
+
+	public static Envelope peek(String json) {
+		var node = MAPPER.readTree(json);
+		return new Envelope(node.path("v").asInt(-1), node.path("type").asString(""),
+				node.path("id").asString(""));
+	}
+
 	public static String encode(Message message) {
 		return MAPPER.writeValueAsString(message);
 	}
