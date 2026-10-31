@@ -1,0 +1,96 @@
+{
+  "$comment": "Fuente única de verdad del protocolo Lupus. Si cambias este archivo, los tests del servidor y del cliente fallan hasta que ambos lados se actualicen.",
+  "version": 1,
+  "envelope": {
+    "v": "number",
+    "type": "string",
+    "id": "string",
+    "at": "number"
+  },
+  "messages": {
+    "hello": {
+      "direction": "c2s",
+      "summary": "El cliente se presenta justo después de abrir la conexión.",
+      "fields": {
+        "nickname": "string"
+      },
+      "example": {
+        "v": 1,
+        "type": "hello",
+        "id": "00000000-0000-0000-0000-000000000001",
+        "at": 1700000000000,
+        "nickname": "Ana"
+      }
+    },
+    "welcome": {
+      "direction": "s2c",
+      "summary": "Handshake del servidor: asigna el identificador de conexión.",
+      "fields": {
+        "connectionId": "string",
+        "nickname": "string",
+        "serverTime": "number"
+      },
+      "example": {
+        "v": 1,
+        "type": "welcome",
+        "id": "00000000-0000-0000-0000-000000000002",
+        "at": 1700000000100,
+        "connectionId": "00000000-0000-0000-0000-0000000000aa",
+        "nickname": "Ana",
+        "serverTime": 1700000000100
+      }
+    },
+    "echo": {
+      "direction": "both",
+      "summary": "Mensaje de prueba: el servidor devuelve el mismo texto.",
+      "fields": {
+        "text": "string"
+      },
+      "example": {
+        "v": 1,
+        "type": "echo",
+        "id": "00000000-0000-0000-0000-000000000003",
+        "at": 1700000000200,
+        "text": "hola"
+      }
+    },
+    "ping": {
+      "direction": "c2s",
+      "summary": "Comprobación de vida del cliente. El servidor responde con pong.",
+      "fields": {},
+      "example": {
+        "v": 1,
+        "type": "ping",
+        "id": "00000000-0000-0000-0000-000000000004",
+        "at": 1700000000300
+      }
+    },
+    "pong": {
+      "direction": "s2c",
+      "summary": "Respuesta a ping.",
+      "fields": {},
+      "example": {
+        "v": 1,
+        "type": "pong",
+        "id": "00000000-0000-0000-0000-000000000005",
+        "at": 1700000000310
+      }
+    },
+    "error": {
+      "direction": "s2c",
+      "summary": "El servidor rechaza un mensaje y explica por qué.",
+      "fields": {
+        "code": "string",
+        "message": "string"
+      },
+      "example": {
+        "v": 1,
+        "type": "error",
+        "id": "00000000-0000-0000-0000-000000000006",
+        "at": 1700000000400,
+        "code": "invalid_message",
+        "message": "El mensaje no cumple el contrato del protocolo."
+      }
+    }
+  }
+}
