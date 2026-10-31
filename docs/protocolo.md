@@ -105,6 +105,17 @@ Códigos de error previstos:
 3. **La versión es obligatoria.** Si `v` no coincide con la versión del servidor, se responde `unsupported_version`.
 4. **Compatibilidad:** cualquier cambio incompatible sube `version` en `protocol.json` y se anota en este documento.
 
+## Handshake
+
+1. El cliente abre `wss://<host>/ws`.
+2. El servidor responde con `welcome` (con `connectionId` y `nickname` vacio).
+3. El cliente envia `hello` con su apodo.
+4. El servidor repite `welcome` con el mismo `connectionId` y ya con el apodo.
+5. A partir de ahi el canal esta listo (`echo`, `ping`/`pong`).
+
+El `connectionId` lo asigna siempre el servidor y no cambia durante la vida de la conexion. Es la
+base para reconectar en la issue #26 y para la cola de mensajes de la issue #33.
+
 ## Cómo se mantiene sincronizado
 
 - `protocol/protocol.json` declara cada mensaje, sus campos y un ejemplo canónico.
