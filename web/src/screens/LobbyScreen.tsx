@@ -8,6 +8,7 @@ import type { SocketStatus } from '../ws/socket'
 const STATUS: Record<SocketStatus, { label: string; dot: string }> = {
   idle: { label: 'Sin conexión', dot: 'bg-parchment/30' },
   connecting: { label: 'Conectando…', dot: 'bg-amber-400' },
+  reconnecting: { label: 'Reconectando…', dot: 'bg-amber-400' },
   open: { label: 'Conectado', dot: 'bg-emerald-400' },
   closed: { label: 'Desconectado', dot: 'bg-blood' },
 }
@@ -16,7 +17,7 @@ const MIN_PLAYERS = 5
 const MAX_PLAYERS = 16
 
 export function LobbyScreen() {
-  const { roomCode, players, status, playerId, leave } = useSession()
+  const { roomCode, players, status, playerId, leave, kickPlayer, notice } = useSession()
   const navigate = useNavigate()
   const [copied, setCopied] = useState(false)
 
@@ -25,7 +26,7 @@ export function LobbyScreen() {
       <Card className="text-center">
         <h2 className="mb-2 text-xl font-semibold">No hay ninguna sala activa</h2>
         <p className="mb-6 text-sm text-parchment/60">
-          Crea una sala o entra con un código para empezar.
+          {notice ?? 'Crea una sala o entra con un código para empezar.'}
         </p>
         <Link to="/">
           <Button>Volver al inicio</Button>
@@ -51,6 +52,7 @@ export function LobbyScreen() {
 
   const estado = STATUS[status]
   const conectados = players.filter((player) => player.connected).length
+  const soyHost = players.some((player) => player.id === playerId && player.host)
 
   return (
     <div className="flex flex-col gap-6">
@@ -116,6 +118,15 @@ export function LobbyScreen() {
                 {!player.connected ? (
                   <span className="text-[10px] uppercase tracking-wide">desconectado</span>
                 ) : null}
+                {soyHost && player.id !== playerId ? (
+                  <Button
+                    variant="ghost"
+                    onClick={() => kickPlayer(player.id)}
+                    aria-label={`Expulsar a ${player.nickname}`}
+                  >
+                    Expulsar
+                  </Button>
+                ) : null}
               </span>
             </li>
           ))}
@@ -126,6 +137,11 @@ export function LobbyScreen() {
             ? `Faltan ${MIN_PLAYERS - conectados} jugador(es) para poder empezar.`
             : 'Ya hay jugadores suficientes para empezar.'}
         </p>
+        {soyHost ? (
+          <p className="mt-1 text-xs text-parchment/40">
+            Si sales siendo host, la sala se cierra para todos.
+          </p>
+        ) : null}
       </Card>
     </div>
   )

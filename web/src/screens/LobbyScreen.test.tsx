@@ -17,8 +17,10 @@ function renderLobby(overrides: Partial<SessionValue> = {}) {
     playerId: 'p-ana',
     players: [ANA, LUIS],
     error: null,
+    notice: null,
     createRoom: vi.fn(),
     joinRoom: vi.fn(),
+    kickPlayer: vi.fn(),
     leave: vi.fn(),
     clearError: vi.fn(),
     ...overrides,
@@ -70,10 +72,29 @@ describe('LobbyScreen', () => {
     expect(value.leave).toHaveBeenCalled()
   })
 
-  it('invita a volver al inicio si no hay sala activa', () => {
-    renderLobby({ roomCode: null, players: [] })
+  it('deja al host expulsar a otros jugadores', () => {
+    const value = renderLobby()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expulsar a Luis' }))
+
+    expect(value.kickPlayer).toHaveBeenCalledWith('p-luis')
+  })
+
+  it('no muestra la opcion de expulsar a quien no es host', () => {
+    renderLobby({ playerId: 'p-luis' })
+
+    expect(screen.queryByRole('button', { name: /expulsar a/i })).not.toBeInTheDocument()
+  })
+
+  it('invita a volver al inicio si no hay sala activa y explica el motivo', () => {
+    renderLobby({
+      roomCode: null,
+      players: [],
+      notice: 'El host te ha expulsado de la sala.',
+    })
 
     expect(screen.getByText('No hay ninguna sala activa')).toBeInTheDocument()
+    expect(screen.getByText('El host te ha expulsado de la sala.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Volver al inicio' })).toBeInTheDocument()
   })
 })

@@ -160,6 +160,61 @@
           { "id": "00000000-0000-0000-0000-0000000000cc", "nickname": "Luis", "host": false, "connected": true }
         ]
       }
+    },
+    "leave_room": {
+      "direction": "c2s",
+      "summary": "Salida voluntaria. Si la sala está en el lobby y sale el host, la sala se cierra.",
+      "fields": {},
+      "example": {
+        "v": 1,
+        "type": "leave_room",
+        "id": "00000000-0000-0000-0000-000000000011",
+        "at": 1700000000900
+      }
+    },
+    "kick_player": {
+      "direction": "c2s",
+      "summary": "El host expulsa a un jugador de la sala.",
+      "fields": {
+        "playerId": "string"
+      },
+      "example": {
+        "v": 1,
+        "type": "kick_player",
+        "id": "00000000-0000-0000-0000-000000000012",
+        "at": 1700000001000,
+        "playerId": "00000000-0000-0000-0000-0000000000cc"
+      }
+    },
+    "room_closed": {
+      "direction": "s2c",
+      "summary": "La sala se ha cerrado; el jugador deja de pertenecer a ella.",
+      "fields": {
+        "roomCode": "string",
+        "reason": "string"
+      },
+      "example": {
+        "v": 1,
+        "type": "room_closed",
+        "id": "00000000-0000-0000-0000-000000000013",
+        "at": 1700000001100,
+        "roomCode": "ABC234",
+        "reason": "host_left"
+      }
+    },
+    "kicked": {
+      "direction": "s2c",
+      "summary": "El host ha expulsado a este jugador de la sala.",
+      "fields": {
+        "roomCode": "string"
+      },
+      "example": {
+        "v": 1,
+        "type": "kicked",
+        "id": "00000000-0000-0000-0000-000000000014",
+        "at": 1700000001200,
+        "roomCode": "ABC234"
+      }
     }
   }
 }

@@ -69,6 +69,21 @@ export interface RoomUpdatedMessage extends Envelope<'room_updated'> {
   players: Player[]
 }
 
+export interface LeaveRoomMessage extends Envelope<'leave_room'> {}
+
+export interface KickPlayerMessage extends Envelope<'kick_player'> {
+  playerId: string
+}
+
+export interface RoomClosedMessage extends Envelope<'room_closed'> {
+  roomCode: string
+  reason: string
+}
+
+export interface KickedMessage extends Envelope<'kicked'> {
+  roomCode: string
+}
+
 export type Message =
   | HelloMessage
   | WelcomeMessage
@@ -80,6 +95,10 @@ export type Message =
   | JoinRoomMessage
   | RoomStateMessage
   | RoomUpdatedMessage
+  | LeaveRoomMessage
+  | KickPlayerMessage
+  | RoomClosedMessage
+  | KickedMessage
 
 export type MessageType = Message['type']
 
@@ -100,6 +119,10 @@ export const MESSAGE_FIELDS: Record<MessageType, Record<string, FieldKind>> = {
   join_room: { roomCode: 'string', nickname: 'string' },
   room_state: { roomCode: 'string', playerId: 'string', players: 'array' },
   room_updated: { roomCode: 'string', players: 'array' },
+  leave_room: {},
+  kick_player: { playerId: 'string' },
+  room_closed: { roomCode: 'string', reason: 'string' },
+  kicked: { roomCode: 'string' },
 }
 
 export const MESSAGE_TYPES = Object.keys(MESSAGE_FIELDS) as MessageType[]

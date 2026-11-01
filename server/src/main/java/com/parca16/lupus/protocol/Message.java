@@ -20,8 +20,12 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 		@JsonSubTypes.Type(value = CreateRoom.class, name = "create_room"),
 		@JsonSubTypes.Type(value = JoinRoom.class, name = "join_room"),
 		@JsonSubTypes.Type(value = RoomState.class, name = "room_state"),
-		@JsonSubTypes.Type(value = RoomUpdated.class, name = "room_updated")
+		@JsonSubTypes.Type(value = RoomUpdated.class, name = "room_updated"),
+		@JsonSubTypes.Type(value = LeaveRoom.class, name = "leave_room"),
+		@JsonSubTypes.Type(value = KickPlayer.class, name = "kick_player"),
+		@JsonSubTypes.Type(value = RoomClosed.class, name = "room_closed"),
+		@JsonSubTypes.Type(value = Kicked.class, name = "kicked")
 })
 public sealed interface Message permits Hello, Welcome, Echo, Ping, Pong, ErrorMessage, CreateRoom, JoinRoom,
-		RoomState, RoomUpdated {
+		RoomState, RoomUpdated, LeaveRoom, KickPlayer, RoomClosed, Kicked {
 }
