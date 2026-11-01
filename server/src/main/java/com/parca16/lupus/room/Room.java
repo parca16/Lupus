@@ -16,21 +16,30 @@ import java.util.UUID;
 public final class Room {
 
 	private final String code;
-	private final RoomSettings settings;
+	private final RoomCapacity capacity;
 	private final Map<String, RoomPlayer> players = new LinkedHashMap<>();
 	private GameState state = GameState.WAITING;
+	private GameSettings gameSettings = GameSettings.DEFAULT;
 
-	Room(String code, RoomSettings settings) {
+	Room(String code, RoomCapacity capacity) {
 		this.code = Objects.requireNonNull(code, "code");
-		this.settings = Objects.requireNonNull(settings, "settings");
+		this.capacity = Objects.requireNonNull(capacity, "capacity");
 	}
 
 	public String code() {
 		return code;
 	}
 
-	public RoomSettings settings() {
-		return settings;
+	public RoomCapacity capacity() {
+		return capacity;
+	}
+
+	public synchronized GameSettings gameSettings() {
+		return gameSettings;
+	}
+
+	public synchronized void gameSettings(GameSettings settings) {
+		this.gameSettings = Objects.requireNonNull(settings, "settings").validated();
 	}
 
 	public synchronized GameState state() {
@@ -45,9 +54,9 @@ public final class Room {
 	public synchronized RoomPlayer addPlayer(String nickname) {
 		String clean = Nicknames.require(nickname);
 
-		if (players.size() >= settings.maxPlayers()) {
+		if (players.size() >= capacity.maxPlayers()) {
 			throw new RoomException(RoomException.ROOM_FULL,
-					"La sala esta completa (" + settings.maxPlayers() + " jugadores).");
+					"La sala esta completa (" + capacity.maxPlayers() + " jugadores).");
 		}
 
 		boolean taken = players.values().stream()

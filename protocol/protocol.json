@@ -215,6 +215,89 @@
         "at": 1700000001200,
         "roomCode": "ABC234"
       }
+    },
+    "update_settings": {
+      "direction": "c2s",
+      "summary": "El host cambia la configuración de la partida.",
+      "fields": {
+        "wolves": "number",
+        "roles": "array",
+        "lives": "number",
+        "president": "boolean",
+        "debateSeconds": "number",
+        "roleSeconds": "number",
+        "voteSeconds": "number",
+        "showVoteDetail": "boolean"
+      },
+      "example": {
+        "v": 1,
+        "type": "update_settings",
+        "id": "00000000-0000-0000-0000-000000000015",
+        "at": 1700000001300,
+        "wolves": 2,
+        "roles": ["seer", "witch"],
+        "lives": 1,
+        "president": false,
+        "debateSeconds": 120,
+        "roleSeconds": 30,
+        "voteSeconds": 45,
+        "showVoteDetail": true
+      }
+    },
+    "room_settings": {
+      "direction": "s2c",
+      "summary": "Configuración vigente de la sala; se envía al crear, al entrar y al cambiarla.",
+      "fields": {
+        "roomCode": "string",
+        "wolves": "number",
+        "roles": "array",
+        "lives": "number",
+        "president": "boolean",
+        "debateSeconds": "number",
+        "roleSeconds": "number",
+        "voteSeconds": "number",
+        "showVoteDetail": "boolean"
+      },
+      "example": {
+        "v": 1,
+        "type": "room_settings",
+        "id": "00000000-0000-0000-0000-000000000016",
+        "at": 1700000001400,
+        "roomCode": "ABC234",
+        "wolves": 2,
+        "roles": ["seer", "witch"],
+        "lives": 1,
+        "president": false,
+        "debateSeconds": 120,
+        "roleSeconds": 30,
+        "voteSeconds": 45,
+        "showVoteDetail": true
+      }
+    },
+    "start_game": {
+      "direction": "c2s",
+      "summary": "El host arranca la partida cuando hay al menos 5 jugadores.",
+      "fields": {},
+      "example": {
+        "v": 1,
+        "type": "start_game",
+        "id": "00000000-0000-0000-0000-000000000017",
+        "at": 1700000001500
+      }
+    },
+    "game_starting": {
+      "direction": "s2c",
+      "summary": "La partida empieza; el lobby deja paso al juego.",
+      "fields": {
+        "roomCode": "string"
+      },
+      "example": {
+        "v": 1,
+        "type": "game_starting",
+        "id": "00000000-0000-0000-0000-000000000018",
+        "at": 1700000001600,
+        "roomCode": "ABC234"
+      }
     }
   }
 }

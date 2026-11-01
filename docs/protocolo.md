@@ -48,6 +48,10 @@ Ejemplo:
 | `kick_player` | cliente → servidor | `playerId` | El host expulsa a un jugador. |
 | `room_closed` | servidor → cliente | `roomCode`, `reason` | La sala se ha cerrado; el jugador deja de pertenecer a ella. |
 | `kicked` | servidor → cliente | `roomCode` | El host ha expulsado a este jugador. |
+| `update_settings` | cliente → servidor | `wolves`, `roles`, `lives`, `president`, `debateSeconds`, `roleSeconds`, `voteSeconds`, `showVoteDetail` | El host cambia la configuración. |
+| `room_settings` | servidor → cliente | `roomCode` + los mismos campos | Configuración vigente (al crear, al entrar y al cambiarla). |
+| `start_game` | cliente → servidor | — | El host arranca la partida. |
+| `game_starting` | servidor → cliente | `roomCode` | La partida empieza. |
 
 El objeto `Player` que viaja dentro de `players` tiene esta forma:
 
@@ -173,6 +177,10 @@ Códigos de error previstos:
 | `nickname_taken` | Ese apodo ya está en uso en la sala. |
 | `not_in_room` | El jugador no pertenece a la sala. |
 | `not_host` | Solo el host puede hacer esa acción. |
+| `invalid_settings` | La configuración no es válida (lobos, vidas, roles o tiempos). |
+| `not_enough_players` | Hacen falta al menos 5 jugadores conectados para empezar. |
+| `invalid_settings_for_players` | Con ese número de jugadores no caben las cartas elegidas. |
+| `game_already_started` | La partida ya ha empezado y no admite jugadores nuevos. |
 
 ## Reglas
 
@@ -205,6 +213,34 @@ base para reconectar en la issue #26 y para la cola de mensajes de la issue #33.
   devuelve **su mismo asiento** (`playerId`), marcándolo de nuevo como conectado. Los mensajes
   enviados mientras estaba caído se guardan en cola y se mandan al reconectar.
 - La identidad persistente entre recargas del navegador llega con la issue #26.
+
+## Configuración y arranque
+
+La configuración la decide el host con `update_settings` y el servidor la difunde a todos como
+`room_settings` (también al crear la sala y al entrar).
+
+| Campo | Tipo | Rango / valores | Por defecto |
+| ----- | ---- | --------------- | ----------- |
+| `wolves` | number | 1–8 | 1 |
+| `roles` | string[] | `seer`, `witch`, `knight`, `guardian`, `cupid` (sin repetir) | `[]` |
+| `lives` | number | 0, 1 o 2 | 1 |
+| `president` | boolean | — | `false` |
+| `debateSeconds` | number | 30–600 | 120 |
+| `roleSeconds` | number | 10–120 | 30 |
+| `voteSeconds` | number | 15–180 | 45 |
+| `showVoteDetail` | boolean | — | `true` |
+
+Reglas de validación (issue #27):
+
+- **Las cartas siempre suman el número de jugadores**: los aldeanos rellenan lo que falta.
+- Debe quedar **al menos un aldeano**, así que `wolves + roles.size() < jugadores conectados`.
+- Los roles especiales son **únicos** y de la lista conocida.
+- Para empezar hacen falta **5 jugadores conectados** como mínimo.
+- Cualquier configuración inválida devuelve `error` con `invalid_settings` y un mensaje claro.
+
+Al empezar (`start_game`), el servidor valida la configuración con el número real de jugadores y
+emite `game_starting` a todos. Solo el host puede cambiar la configuración o empezar la partida
+(`not_host` en caso contrario).
 
 ## Cómo se mantiene sincronizado
 

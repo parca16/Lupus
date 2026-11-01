@@ -77,6 +77,14 @@ describe('protocolo (contrato compartido)', () => {
     ).toBe(false)
   })
 
+  it('rechaza roles especiales desconocidos', () => {
+    const base = contract.messages.update_settings.example
+
+    expect(isMessage({ ...base, roles: ['seer'] })).toBe(true)
+    expect(isMessage({ ...base, roles: ['inventor'] })).toBe(false)
+    expect(isMessage({ ...base, roles: 'seer' })).toBe(false)
+  })
+
   it('crea mensajes válidos y los recupera tras serializar', () => {
     const echo = createMessage('echo', { text: 'hola' }, { id: 'id-1', at: 42 })
 

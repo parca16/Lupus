@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { Player } from '../protocol'
+import type { GameSettings, Player } from '../protocol'
 import { LupusSocket } from '../ws/socket'
 import type { SocketStatus } from '../ws/socket'
 import { SessionContext } from './context'
@@ -33,6 +33,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [roomCode, setRoomCode] = useState<string | null>(null)
   const [playerId, setPlayerId] = useState<string | null>(null)
   const [players, setPlayers] = useState<Player[]>([])
+  const [settings, setSettings] = useState<GameSettings | null>(null)
+  const [starting, setStarting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
@@ -48,6 +50,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setRoomCode(null)
     setPlayerId(null)
     setPlayers([])
+    setSettings(null)
+    setStarting(false)
   }, [])
 
   const start = useCallback(
@@ -101,6 +105,21 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             case 'room_updated':
               setPlayers(message.players)
               break
+            case 'room_settings':
+              setSettings({
+                wolves: message.wolves,
+                roles: message.roles,
+                lives: message.lives,
+                president: message.president,
+                debateSeconds: message.debateSeconds,
+                roleSeconds: message.roleSeconds,
+                voteSeconds: message.voteSeconds,
+                showVoteDetail: message.showVoteDetail,
+              })
+              break
+            case 'game_starting':
+              setStarting(true)
+              break
             case 'error':
               setError(ERROR_MESSAGES[message.code] ?? message.message)
               break
@@ -142,6 +161,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     socketRef.current?.send('kick_player', { playerId: targetPlayerId })
   }, [])
 
+  const updateSettings = useCallback((next: GameSettings) => {
+    socketRef.current?.send('update_settings', next)
+  }, [])
+
+  const startGame = useCallback(() => {
+    socketRef.current?.send('start_game', {})
+  }, [])
+
   const leave = useCallback(() => {
     const socket = socketRef.current
     if (socket) {
@@ -166,11 +193,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       roomCode,
       playerId,
       players,
+      settings,
+      starting,
       error,
       notice,
       createRoom,
       joinRoom,
       kickPlayer,
+      updateSettings,
+      startGame,
       leave,
       clearError,
     }),
@@ -180,11 +211,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       roomCode,
       playerId,
       players,
+      settings,
+      starting,
       error,
       notice,
       createRoom,
       joinRoom,
       kickPlayer,
+      updateSettings,
+      startGame,
       leave,
       clearError,
     ],
