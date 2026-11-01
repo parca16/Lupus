@@ -40,6 +40,19 @@ Ejemplo:
 | `ping` | cliente → servidor | — | Comprobación de vida. |
 | `pong` | servidor → cliente | — | Respuesta a `ping`. |
 | `error` | servidor → cliente | `code`, `message` | El servidor rechaza un mensaje y explica por qué. |
+| `create_room` | cliente → servidor | `nickname` | Crea una sala privada; el creador es host. |
+| `join_room` | cliente → servidor | `roomCode`, `nickname` | Entra en una sala por su código. |
+| `room_state` | servidor → cliente | `roomCode`, `playerId`, `players` | Respuesta a `create_room`/`join_room`. |
+| `room_updated` | servidor → cliente | `roomCode`, `players` | La lista de jugadores ha cambiado. |
+
+El objeto `Player` que viaja dentro de `players` tiene esta forma:
+
+| Campo | Tipo | Descripción |
+| ----- | ---- | ----------- |
+| `id` | string | Identificador del jugador dentro de la sala. |
+| `nickname` | string | Apodo visible (3-16 caracteres, único en la sala). |
+| `host` | boolean | `true` solo para quien creó la sala. |
+| `connected` | boolean | `false` mientras esté desconectado. |
 
 ### `hello`
 
@@ -77,6 +90,59 @@ Ejemplo:
 { "v": 1, "type": "pong", "id": "…", "at": 1700000000310 }
 ```
 
+### Salas
+
+```json
+{ "v": 1, "type": "create_room", "id": "…", "at": 1700000000500, "nickname": "Ana" }
+```
+
+```json
+{
+  "v": 1,
+  "type": "join_room",
+  "id": "…",
+  "at": 1700000000600,
+  "roomCode": "ABC234",
+  "nickname": "Luis"
+}
+```
+
+```json
+{
+  "v": 1,
+  "type": "room_state",
+  "id": "…",
+  "at": 1700000000700,
+  "roomCode": "ABC234",
+  "playerId": "…",
+  "players": [
+    { "id": "…", "nickname": "Ana", "host": true, "connected": true }
+  ]
+}
+```
+
+```json
+{
+  "v": 1,
+  "type": "room_updated",
+  "id": "…",
+  "at": 1700000000800,
+  "roomCode": "ABC234",
+  "players": [
+    { "id": "…", "nickname": "Ana", "host": true, "connected": true },
+    { "id": "…", "nickname": "Luis", "host": false, "connected": true }
+  ]
+}
+```
+
+Reglas de las salas:
+
+- El código tiene **6 caracteres** y se genera en el servidor (sin caracteres ambiguos como `O`, `0`, `I`, `1`).
+- El primer jugador es **host**.
+- Aforo: **mínimo 5** para empezar, **máximo 16** para entrar.
+- El **nickname** tiene entre 3 y 16 caracteres y es único dentro de la sala (sin distinguir mayúsculas).
+- Al desconectarse, el jugador se queda en la lista con `connected: false` y se difunde `room_updated`.
+
 ### `error`
 
 ```json
@@ -97,6 +163,11 @@ Códigos de error previstos:
 | `invalid_message` | El JSON no cumple el contrato. |
 | `unknown_type` | El `type` no existe en el protocolo. |
 | `unsupported_version` | El campo `v` no es la versión soportada. |
+| `invalid_nickname` | El apodo no tiene entre 3 y 16 caracteres válidos. |
+| `room_not_found` | No existe ninguna sala con ese código. |
+| `room_full` | La sala ya tiene 16 jugadores. |
+| `nickname_taken` | Ese apodo ya está en uso en la sala. |
+| `not_in_room` | El jugador no pertenece a la sala. |
 
 ## Reglas
 

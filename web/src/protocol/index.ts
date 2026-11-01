@@ -41,6 +41,34 @@ export interface ErrorMessage extends Envelope<'error'> {
   message: string
 }
 
+/** Jugador tal y como viaja por el cable. */
+export interface Player {
+  id: string
+  nickname: string
+  host: boolean
+  connected: boolean
+}
+
+export interface CreateRoomMessage extends Envelope<'create_room'> {
+  nickname: string
+}
+
+export interface JoinRoomMessage extends Envelope<'join_room'> {
+  roomCode: string
+  nickname: string
+}
+
+export interface RoomStateMessage extends Envelope<'room_state'> {
+  roomCode: string
+  playerId: string
+  players: Player[]
+}
+
+export interface RoomUpdatedMessage extends Envelope<'room_updated'> {
+  roomCode: string
+  players: Player[]
+}
+
 export type Message =
   | HelloMessage
   | WelcomeMessage
@@ -48,10 +76,14 @@ export type Message =
   | PingMessage
   | PongMessage
   | ErrorMessage
+  | CreateRoomMessage
+  | JoinRoomMessage
+  | RoomStateMessage
+  | RoomUpdatedMessage
 
 export type MessageType = Message['type']
 
-type FieldKind = 'string' | 'number'
+type FieldKind = 'string' | 'number' | 'boolean' | 'array'
 
 /**
  * Campos extra de cada mensaje (sin el sobre). Es el espejo en tiempo de ejecución de
@@ -64,6 +96,10 @@ export const MESSAGE_FIELDS: Record<MessageType, Record<string, FieldKind>> = {
   ping: {},
   pong: {},
   error: { code: 'string', message: 'string' },
+  create_room: { nickname: 'string' },
+  join_room: { roomCode: 'string', nickname: 'string' },
+  room_state: { roomCode: 'string', playerId: 'string', players: 'array' },
+  room_updated: { roomCode: 'string', players: 'array' },
 }
 
 export const MESSAGE_TYPES = Object.keys(MESSAGE_FIELDS) as MessageType[]
@@ -97,6 +133,23 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+export function isPlayer(value: unknown): value is Player {
+  return (
+    isRecord(value) &&
+    typeof value.id === 'string' &&
+    typeof value.nickname === 'string' &&
+    typeof value.host === 'boolean' &&
+    typeof value.connected === 'boolean'
+  )
+}
+
+function matchesKind(value: unknown, kind: FieldKind): boolean {
+  if (kind === 'array') {
+    return Array.isArray(value)
+  }
+  return typeof value === kind
+}
+
 /** Valida en tiempo de ejecución que un valor desconocido es un mensaje del protocolo. */
 export function isMessage(value: unknown): value is Message {
   if (!isRecord(value)) {
@@ -120,7 +173,15 @@ export function isMessage(value: unknown): value is Message {
     return false
   }
 
-  return Object.entries(fields).every(([name, kind]) => typeof value[name] === kind)
+  if (!Object.entries(fields).every(([name, kind]) => matchesKind(value[name], kind))) {
+    return false
+  }
+
+  if ('players' in value && !(value.players as unknown[]).every(isPlayer)) {
+    return false
+  }
+
+  return true
 }
 
 export function serializeMessage(message: Message): string {

@@ -65,6 +65,18 @@ describe('protocolo (contrato compartido)', () => {
     expect(isMessage('hola')).toBe(false)
   })
 
+  it('valida la forma de cada jugador de la lista', () => {
+    const ejemplo = contract.messages.room_state.example
+
+    expect(isMessage({ ...ejemplo, players: [] })).toBe(true)
+    expect(
+      isMessage({
+        ...ejemplo,
+        players: [{ id: 'x', nickname: 'Ana', host: 'si', connected: true }],
+      }),
+    ).toBe(false)
+  })
+
   it('crea mensajes válidos y los recupera tras serializar', () => {
     const echo = createMessage('echo', { text: 'hola' }, { id: 'id-1', at: 42 })
 

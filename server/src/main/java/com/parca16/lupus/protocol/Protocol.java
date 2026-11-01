@@ -22,7 +22,11 @@ public final class Protocol {
 			"echo", Echo.class,
 			"ping", Ping.class,
 			"pong", Pong.class,
-			"error", ErrorMessage.class);
+			"error", ErrorMessage.class,
+			"create_room", CreateRoom.class,
+			"join_room", JoinRoom.class,
+			"room_state", RoomState.class,
+			"room_updated", RoomUpdated.class);
 
 	private static final ObjectMapper MAPPER = JsonMapper.builder().build();
 
