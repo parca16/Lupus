@@ -16,17 +16,21 @@ public final class Protocol {
 	/** Versión actual del protocolo. Debe coincidir con {@code protocol.json}. */
 	public static final int VERSION = 1;
 
-	private static final Map<String, Class<? extends Message>> TYPES = Map.of(
-			"hello", Hello.class,
-			"welcome", Welcome.class,
-			"echo", Echo.class,
-			"ping", Ping.class,
-			"pong", Pong.class,
-			"error", ErrorMessage.class,
-			"create_room", CreateRoom.class,
-			"join_room", JoinRoom.class,
-			"room_state", RoomState.class,
-			"room_updated", RoomUpdated.class);
+	private static final Map<String, Class<? extends Message>> TYPES = Map.ofEntries(
+			Map.entry("hello", Hello.class),
+			Map.entry("welcome", Welcome.class),
+			Map.entry("echo", Echo.class),
+			Map.entry("ping", Ping.class),
+			Map.entry("pong", Pong.class),
+			Map.entry("error", ErrorMessage.class),
+			Map.entry("create_room", CreateRoom.class),
+			Map.entry("join_room", JoinRoom.class),
+			Map.entry("room_state", RoomState.class),
+			Map.entry("room_updated", RoomUpdated.class),
+			Map.entry("leave_room", LeaveRoom.class),
+			Map.entry("kick_player", KickPlayer.class),
+			Map.entry("room_closed", RoomClosed.class),
+			Map.entry("kicked", Kicked.class));
 
 	private static final ObjectMapper MAPPER = JsonMapper.builder().build();
 

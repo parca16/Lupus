@@ -83,6 +83,52 @@ class RoomTest {
 	}
 
 	@Test
+	void soloElHostSeReconoceComoHost() {
+		Room room = nuevaSala();
+		RoomPlayer host = room.addPlayer("Ana");
+		RoomPlayer invitado = room.addPlayer("Luis");
+
+		assertTrue(room.isHost(host.id()));
+		assertFalse(room.isHost(invitado.id()));
+		assertFalse(room.isHost("fantasma"));
+	}
+
+	@Test
+	void expulsarSacaAlJugadorDeLaSala() {
+		Room room = nuevaSala();
+		room.addPlayer("Ana");
+		RoomPlayer invitado = room.addPlayer("Luis");
+
+		room.remove(invitado.id());
+
+		assertFalse(room.contains(invitado.id()));
+		assertEquals(1, room.size());
+		assertEquals(RoomException.NOT_IN_ROOM,
+				assertThrows(RoomException.class, () -> room.remove(invitado.id())).code());
+	}
+
+	@Test
+	void reconectarRecuperaElAsientoDeUnJugadorDesconectado() {
+		Room room = nuevaSala();
+		RoomPlayer invitado = room.addPlayer("Luis");
+		room.disconnect(invitado.id());
+
+		RoomPlayer recuperado = room.reconnect("luis").orElseThrow();
+
+		assertEquals(invitado.id(), recuperado.id());
+		assertTrue(recuperado.connected());
+		assertEquals(1, room.size());
+	}
+
+	@Test
+	void reconectarNoRecuperaUnAsientoQueSigueConectado() {
+		Room room = nuevaSala();
+		room.addPlayer("Luis");
+
+		assertTrue(room.reconnect("Luis").isEmpty());
+	}
+
+	@Test
 	void elApodoSeLimpiaYDebeTenerEntreTresYDieciseisCaracteres() {
 		Room room = nuevaSala();
 

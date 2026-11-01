@@ -9,8 +9,10 @@ export interface SessionValue {
   playerId: string | null
   players: Player[]
   error: string | null
+  notice: string | null
   createRoom: (nickname: string) => void
   joinRoom: (roomCode: string, nickname: string) => void
+  kickPlayer: (playerId: string) => void
   leave: () => void
   clearError: () => void
 }

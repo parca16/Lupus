@@ -8,6 +8,7 @@ public class RoomException extends RuntimeException {
 	public static final String ROOM_FULL = "room_full";
 	public static final String NICKNAME_TAKEN = "nickname_taken";
 	public static final String NOT_IN_ROOM = "not_in_room";
+	public static final String NOT_HOST = "not_host";
 
 	private final String code;
 

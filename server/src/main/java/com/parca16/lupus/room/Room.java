@@ -4,6 +4,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -70,6 +71,39 @@ public final class Room {
 		RoomPlayer disconnected = player.disconnected();
 		players.put(playerId, disconnected);
 		return disconnected;
+	}
+
+	/** Saca a un jugador de la sala. */
+	public synchronized RoomPlayer remove(String playerId) {
+		RoomPlayer removed = players.remove(playerId);
+		if (removed == null) {
+			throw new RoomException(RoomException.NOT_IN_ROOM, "El jugador no pertenece a esta sala.");
+		}
+		return removed;
+	}
+
+	/**
+	 * Recupera el asiento de un jugador desconectado con ese apodo.
+	 *
+	 * <p>Es la base de la reconexion: mientras el jugador no se haya ido voluntariamente, su
+	 * asiento le espera. La identidad persistente llega con la issue #26.
+	 */
+	public synchronized Optional<RoomPlayer> reconnect(String nickname) {
+		String clean = Nicknames.require(nickname);
+
+		return players.values().stream()
+				.filter(player -> !player.connected() && player.nickname().equalsIgnoreCase(clean))
+				.findFirst()
+				.map(player -> {
+					RoomPlayer reconnected = new RoomPlayer(player.id(), player.nickname(), player.host(), true);
+					players.put(player.id(), reconnected);
+					return reconnected;
+				});
+	}
+
+	public synchronized boolean isHost(String playerId) {
+		RoomPlayer player = players.get(playerId);
+		return player != null && player.host();
 	}
 
 	public synchronized List<RoomPlayer> players() {

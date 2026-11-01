@@ -44,6 +44,10 @@ Ejemplo:
 | `join_room` | cliente → servidor | `roomCode`, `nickname` | Entra en una sala por su código. |
 | `room_state` | servidor → cliente | `roomCode`, `playerId`, `players` | Respuesta a `create_room`/`join_room`. |
 | `room_updated` | servidor → cliente | `roomCode`, `players` | La lista de jugadores ha cambiado. |
+| `leave_room` | cliente → servidor | — | Salida voluntaria. Si sale el host en el lobby, la sala se cierra. |
+| `kick_player` | cliente → servidor | `playerId` | El host expulsa a un jugador. |
+| `room_closed` | servidor → cliente | `roomCode`, `reason` | La sala se ha cerrado; el jugador deja de pertenecer a ella. |
+| `kicked` | servidor → cliente | `roomCode` | El host ha expulsado a este jugador. |
 
 El objeto `Player` que viaja dentro de `players` tiene esta forma:
 
@@ -168,6 +172,7 @@ Códigos de error previstos:
 | `room_full` | La sala ya tiene 16 jugadores. |
 | `nickname_taken` | Ese apodo ya está en uso en la sala. |
 | `not_in_room` | El jugador no pertenece a la sala. |
+| `not_host` | Solo el host puede hacer esa acción. |
 
 ## Reglas
 
@@ -186,6 +191,20 @@ Códigos de error previstos:
 
 El `connectionId` lo asigna siempre el servidor y no cambia durante la vida de la conexion. Es la
 base para reconectar en la issue #26 y para la cola de mensajes de la issue #33.
+
+## Salir, expulsar y reconexión
+
+- **Salir** (`leave_room`): el jugador desaparece de la lista y se difunde `room_updated`. Si quien
+  sale es el host y la sala sigue en el lobby, la sala se cierra: el resto recibe `room_closed`
+  con `reason: "host_left"`.
+- **Expulsar** (`kick_player`): solo el host. El expulsado recibe `kicked` y el resto
+  `room_updated`. Si alguien que no es host lo intenta, recibe `error` con `not_host`.
+- **Desconexión**: no es lo mismo que salir. El jugador se queda con `connected: false` y la sala
+  sigue abierta (también si era el host), para que pueda volver.
+- **Reconexión**: al volver, el cliente reenvía `join_room` con el mismo apodo y el servidor le
+  devuelve **su mismo asiento** (`playerId`), marcándolo de nuevo como conectado. Los mensajes
+  enviados mientras estaba caído se guardan en cola y se mandan al reconectar.
+- La identidad persistente entre recargas del navegador llega con la issue #26.
 
 ## Cómo se mantiene sincronizado
 
