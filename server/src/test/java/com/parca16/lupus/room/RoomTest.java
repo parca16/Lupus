@@ -12,7 +12,7 @@ class RoomTest {
 	private static final String CODE = "ABC234";
 
 	private Room nuevaSala() {
-		return new Room(CODE, RoomSettings.DEFAULT);
+		return new Room(CODE, RoomCapacity.DEFAULT);
 	}
 
 	@Test
@@ -22,7 +22,7 @@ class RoomTest {
 		assertEquals(CODE, room.code());
 		assertEquals(GameState.WAITING, room.state());
 		assertEquals(0, room.size());
-		assertEquals(RoomSettings.DEFAULT, room.settings());
+		assertEquals(RoomCapacity.DEFAULT, room.capacity());
 	}
 
 	@Test

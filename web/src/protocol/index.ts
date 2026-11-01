@@ -84,6 +84,34 @@ export interface KickedMessage extends Envelope<'kicked'> {
   roomCode: string
 }
 
+/** Roles especiales que el host puede activar. */
+export const ROLES = ['seer', 'witch', 'knight', 'guardian', 'cupid'] as const
+
+export type Role = (typeof ROLES)[number]
+
+export interface GameSettings {
+  wolves: number
+  roles: Role[]
+  lives: number
+  president: boolean
+  debateSeconds: number
+  roleSeconds: number
+  voteSeconds: number
+  showVoteDetail: boolean
+}
+
+export interface UpdateSettingsMessage extends Envelope<'update_settings'>, GameSettings {}
+
+export interface RoomSettingsMessage extends Envelope<'room_settings'>, GameSettings {
+  roomCode: string
+}
+
+export interface StartGameMessage extends Envelope<'start_game'> {}
+
+export interface GameStartingMessage extends Envelope<'game_starting'> {
+  roomCode: string
+}
+
 export type Message =
   | HelloMessage
   | WelcomeMessage
@@ -99,6 +127,10 @@ export type Message =
   | KickPlayerMessage
   | RoomClosedMessage
   | KickedMessage
+  | UpdateSettingsMessage
+  | RoomSettingsMessage
+  | StartGameMessage
+  | GameStartingMessage
 
 export type MessageType = Message['type']
 
@@ -123,6 +155,29 @@ export const MESSAGE_FIELDS: Record<MessageType, Record<string, FieldKind>> = {
   kick_player: { playerId: 'string' },
   room_closed: { roomCode: 'string', reason: 'string' },
   kicked: { roomCode: 'string' },
+  update_settings: {
+    wolves: 'number',
+    roles: 'array',
+    lives: 'number',
+    president: 'boolean',
+    debateSeconds: 'number',
+    roleSeconds: 'number',
+    voteSeconds: 'number',
+    showVoteDetail: 'boolean',
+  },
+  room_settings: {
+    roomCode: 'string',
+    wolves: 'number',
+    roles: 'array',
+    lives: 'number',
+    president: 'boolean',
+    debateSeconds: 'number',
+    roleSeconds: 'number',
+    voteSeconds: 'number',
+    showVoteDetail: 'boolean',
+  },
+  start_game: {},
+  game_starting: { roomCode: 'string' },
 }
 
 export const MESSAGE_TYPES = Object.keys(MESSAGE_FIELDS) as MessageType[]
@@ -202,6 +257,13 @@ export function isMessage(value: unknown): value is Message {
 
   if ('players' in value && !(value.players as unknown[]).every(isPlayer)) {
     return false
+  }
+
+  if ('roles' in value) {
+    const roles = value.roles as unknown[]
+    if (!roles.every((role) => typeof role === 'string' && (ROLES as readonly string[]).includes(role))) {
+      return false
+    }
   }
 
   return true

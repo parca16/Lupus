@@ -21,13 +21,13 @@ public class RoomRegistry {
 
 	/** Crea una sala nueva con codigo unico. */
 	public Room create() {
-		return create(RoomSettings.DEFAULT);
+		return create(RoomCapacity.DEFAULT);
 	}
 
-	public Room create(RoomSettings settings) {
+	public Room create(RoomCapacity capacity) {
 		for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
 			String code = generateCode();
-			Room room = new Room(code, settings);
+			Room room = new Room(code, capacity);
 			if (rooms.putIfAbsent(code, room) == null) {
 				return room;
 			}

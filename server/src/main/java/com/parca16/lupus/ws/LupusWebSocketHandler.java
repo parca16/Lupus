@@ -14,6 +14,7 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 import com.parca16.lupus.protocol.CreateRoom;
 import com.parca16.lupus.protocol.Echo;
 import com.parca16.lupus.protocol.ErrorMessage;
+import com.parca16.lupus.protocol.GameStarting;
 import com.parca16.lupus.protocol.Hello;
 import com.parca16.lupus.protocol.JoinRoom;
 import com.parca16.lupus.protocol.KickPlayer;
@@ -25,9 +26,14 @@ import com.parca16.lupus.protocol.Player;
 import com.parca16.lupus.protocol.Pong;
 import com.parca16.lupus.protocol.Protocol;
 import com.parca16.lupus.protocol.RoomClosed;
+import com.parca16.lupus.protocol.RoomSettings;
 import com.parca16.lupus.protocol.RoomState;
 import com.parca16.lupus.protocol.RoomUpdated;
+import com.parca16.lupus.protocol.StartGame;
+import com.parca16.lupus.protocol.UpdateSettings;
 import com.parca16.lupus.protocol.Welcome;
+import com.parca16.lupus.room.GameSettings;
+import com.parca16.lupus.room.GameState;
 import com.parca16.lupus.room.Room;
 import com.parca16.lupus.room.RoomException;
 import com.parca16.lupus.room.RoomPlayer;
@@ -134,6 +140,8 @@ public class LupusWebSocketHandler extends TextWebSocketHandler {
 			case JoinRoom joinRoom -> unirseASala(session, joinRoom);
 			case LeaveRoom ignored -> salirDeSala(session);
 			case KickPlayer kickPlayer -> expulsar(session, kickPlayer);
+			case UpdateSettings updateSettings -> actualizarConfiguracion(session, updateSettings);
+			case StartGame ignored -> empezarPartida(session);
 			default -> sendError(session, "unknown_type", "Mensaje no admitido del cliente.");
 		}
 	}
@@ -144,18 +152,56 @@ public class LupusWebSocketHandler extends TextWebSocketHandler {
 
 		vincular(session, room, player);
 		sendRoomState(session, room, player);
+		sendRoomSettings(session, room);
 	}
 
 	private void unirseASala(WebSocketSession session, JoinRoom message) {
 		Room room = rooms.find(message.roomCode()).orElseThrow(() -> new RoomException(
 				RoomException.ROOM_NOT_FOUND, "No existe ninguna sala con el codigo " + message.roomCode()));
 
-		RoomPlayer player = room.reconnect(message.nickname())
-				.orElseGet(() -> room.addPlayer(message.nickname()));
+		RoomPlayer player = room.reconnect(message.nickname()).orElse(null);
+		if (player == null) {
+			if (room.state() != GameState.WAITING) {
+				throw new RoomException(RoomException.GAME_ALREADY_STARTED,
+						"La partida ya ha empezado; no se puede entrar.");
+			}
+			player = room.addPlayer(message.nickname());
+		}
 
 		vincular(session, room, player);
 		sendRoomState(session, room, player);
+		sendRoomSettings(session, room);
 		broadcast(room, player.id());
+	}
+
+	private void actualizarConfiguracion(WebSocketSession session, UpdateSettings message) {
+		Room room = salaActual(session);
+
+		if (!room.isHost(jugadorActual(session))) {
+			throw new RoomException(RoomException.NOT_HOST, "Solo el host puede cambiar la configuracion.");
+		}
+
+		GameSettings settings = new GameSettings(message.wolves(), message.roles(), message.lives(),
+				message.president(), message.debateSeconds(), message.roleSeconds(), message.voteSeconds(),
+				message.showVoteDetail());
+
+		room.gameSettings(settings);
+		broadcastToAll(room, roomSettingsMessage(room));
+	}
+
+	private void empezarPartida(WebSocketSession session) {
+		Room room = salaActual(session);
+
+		if (!room.isHost(jugadorActual(session))) {
+			throw new RoomException(RoomException.NOT_HOST, "Solo el host puede empezar la partida.");
+		}
+
+		int conectados = (int) room.players().stream().filter(RoomPlayer::connected).count();
+		room.gameSettings().validatedForStart(conectados);
+		room.state(GameState.STARTING);
+
+		broadcastToAll(room, new GameStarting(Protocol.VERSION, UUID.randomUUID().toString(),
+				System.currentTimeMillis(), room.code()));
 	}
 
 	private void salirDeSala(WebSocketSession session) {
@@ -242,6 +288,24 @@ public class LupusWebSocketHandler extends TextWebSocketHandler {
 	private void sendRoomState(WebSocketSession session, Room room, RoomPlayer player) {
 		send(session, new RoomState(Protocol.VERSION, UUID.randomUUID().toString(), System.currentTimeMillis(),
 				room.code(), player.id(), wire(room.players())));
+	}
+
+	private void sendRoomSettings(WebSocketSession session, Room room) {
+		send(session, roomSettingsMessage(room));
+	}
+
+	private static RoomSettings roomSettingsMessage(Room room) {
+		GameSettings settings = room.gameSettings();
+		return new RoomSettings(Protocol.VERSION, UUID.randomUUID().toString(), System.currentTimeMillis(),
+				room.code(), settings.wolves(), settings.roles(), settings.lives(), settings.president(),
+				settings.debateSeconds(), settings.roleSeconds(), settings.voteSeconds(),
+				settings.showVoteDetail());
+	}
+
+	private void broadcastToAll(Room room, Message message) {
+		for (RoomPlayer player : room.players()) {
+			sessions.find(player.id()).ifPresent(target -> send(target, message));
+		}
 	}
 
 	private void broadcast(Room room, String excludedPlayerId) {
