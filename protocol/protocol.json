@@ -91,6 +91,75 @@
         "code": "invalid_message",
         "message": "El mensaje no cumple el contrato del protocolo."
       }
+    },
+    "create_room": {
+      "direction": "c2s",
+      "summary": "Crea una sala privada. El creador pasa a ser host.",
+      "fields": {
+        "nickname": "string"
+      },
+      "example": {
+        "v": 1,
+        "type": "create_room",
+        "id": "00000000-0000-0000-0000-000000000007",
+        "at": 1700000000500,
+        "nickname": "Ana"
+      }
+    },
+    "join_room": {
+      "direction": "c2s",
+      "summary": "Entra en una sala existente con su código.",
+      "fields": {
+        "roomCode": "string",
+        "nickname": "string"
+      },
+      "example": {
+        "v": 1,
+        "type": "join_room",
+        "id": "00000000-0000-0000-0000-000000000008",
+        "at": 1700000000600,
+        "roomCode": "ABC234",
+        "nickname": "Luis"
+      }
+    },
+    "room_state": {
+      "direction": "s2c",
+      "summary": "Respuesta a create_room y join_room: la sala y quién eres en ella.",
+      "fields": {
+        "roomCode": "string",
+        "playerId": "string",
+        "players": "array"
+      },
+      "example": {
+        "v": 1,
+        "type": "room_state",
+        "id": "00000000-0000-0000-0000-000000000009",
+        "at": 1700000000700,
+        "roomCode": "ABC234",
+        "playerId": "00000000-0000-0000-0000-0000000000bb",
+        "players": [
+          { "id": "00000000-0000-0000-0000-0000000000bb", "nickname": "Ana", "host": true, "connected": true }
+        ]
+      }
+    },
+    "room_updated": {
+      "direction": "s2c",
+      "summary": "La lista de jugadores de la sala ha cambiado (alta, baja o desconexión).",
+      "fields": {
+        "roomCode": "string",
+        "players": "array"
+      },
+      "example": {
+        "v": 1,
+        "type": "room_updated",
+        "id": "00000000-0000-0000-0000-000000000010",
+        "at": 1700000000800,
+        "roomCode": "ABC234",
+        "players": [
+          { "id": "00000000-0000-0000-0000-0000000000bb", "nickname": "Ana", "host": true, "connected": true },
+          { "id": "00000000-0000-0000-0000-0000000000cc", "nickname": "Luis", "host": false, "connected": true }
+        ]
+      }
     }
   }
 }

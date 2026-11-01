@@ -131,6 +131,12 @@ class ProtocolContractTest {
 		if (type == int.class || type == long.class || type == double.class) {
 			return "number";
 		}
+		if (type == boolean.class) {
+			return "boolean";
+		}
+		if (java.util.List.class.isAssignableFrom(type)) {
+			return "array";
+		}
 		return type.getSimpleName();
 	}
 }

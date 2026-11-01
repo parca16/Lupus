@@ -16,7 +16,12 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 		@JsonSubTypes.Type(value = Echo.class, name = "echo"),
 		@JsonSubTypes.Type(value = Ping.class, name = "ping"),
 		@JsonSubTypes.Type(value = Pong.class, name = "pong"),
-		@JsonSubTypes.Type(value = ErrorMessage.class, name = "error")
+		@JsonSubTypes.Type(value = ErrorMessage.class, name = "error"),
+		@JsonSubTypes.Type(value = CreateRoom.class, name = "create_room"),
+		@JsonSubTypes.Type(value = JoinRoom.class, name = "join_room"),
+		@JsonSubTypes.Type(value = RoomState.class, name = "room_state"),
+		@JsonSubTypes.Type(value = RoomUpdated.class, name = "room_updated")
 })
-public sealed interface Message permits Hello, Welcome, Echo, Ping, Pong, ErrorMessage {
+public sealed interface Message permits Hello, Welcome, Echo, Ping, Pong, ErrorMessage, CreateRoom, JoinRoom,
+		RoomState, RoomUpdated {
 }
