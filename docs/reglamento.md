@@ -1,10 +1,11 @@
 # Reglamento de Lupus
 
-> **Estado:** propuesta v0.1 para validar (issue #75).
-> Las reglas marcadas como **✅ recomendado** se implementarán tal cual salvo que se indique lo
-> contrario en la revisión. Las dudas están agrupadas al final, en [Decisiones abiertas](#decisiones-abiertas).
+> **Estado:** v0.2 — decisiones D1–D13 validadas (issue #75).
+> Las reglas están cerradas y este documento es la especificación del motor (#34–#45) y la base
+> del glosario (#77).
 >
-> Este documento es la referencia del motor (#34–#45) y del glosario (#77).
+> **Cambios respecto a v0.1:** debate por defecto 240 s con cierre anticipado, ventana de rol 20 s
+> y victoria de los lobos por paridad **contando el voto doble del Presidente** (D11).
 
 ## 1. Resumen
 
@@ -207,11 +208,41 @@ objetivo). Si el jugador está desconectado, se comporta igual: su ventana expir
 Se comprueba **después de cada muerte definitiva** (#44), en este orden de prioridad:
 
 1. **Enamorados**: si solo quedan vivos los dos enamorados (de bandos distintos), ganan ellos.
-2. **Pueblo**: si no queda ningún lobo vivo, gana el pueblo.
-3. **Lobos**: si no queda ningún no-lobo vivo, ganan los lobos.
+   Esta comprobación va por delante de todo.
+2. **Lobos**: ganan si el pueblo **ya no puede linchar a un lobo**. Para saberlo se cuenta el voto
+   doble del Presidente:
 
-Si en la misma resolución mueren el último lobo y el último no-lobo, **gana el pueblo** (han
-eliminado a todos los lobos). La partida termina en ese instante y se revelan todos los roles.
+   ```
+   votosLobos  = lobos vivos          + (Presidente vivo y lobo    ? 1 : 0)
+   votosPueblo = no lobos vivos       + (Presidente vivo y no lobo ? 1 : 0)
+   ganan los lobos si votosLobos >= votosPueblo
+   ```
+
+   Es decir, los lobos ganan cuando empatan o superan los votos del pueblo, porque a partir de ahí
+   el pueblo no puede sacar adelante un linchamiento.
+3. **Pueblo**: si no queda ningún lobo vivo, gana el pueblo.
+
+Precedencia: **enamorados → lobos (paridad) → pueblo**. Si no queda ningún lobo pero sí aldeanos,
+la paridad es falsa y gana el pueblo; si no queda nadie, la paridad 0 ≥ 0 da la victoria a los
+lobos (D11).
+
+### Ejemplos de la cuenta
+
+| Vivos | Presidente | Cálculo | Resultado |
+| ----- | ---------- | ------- | --------- |
+| 1 lobo + 1 aldeano | ninguno | 1 ≥ 1 | **Ganan los lobos** |
+| 1 lobo + 1 aldeano | el lobo | 2 ≥ 1 | **Ganan los lobos** |
+| 1 lobo + 1 aldeano | el aldeano | 1 ≥ 2 es falso | **La partida sigue**: el pueblo puede linchar |
+| 2 lobos + 2 aldeanos | ninguno | 2 ≥ 2 | **Ganan los lobos** |
+| 2 lobos + 2 aldeanos | un aldeano | 2 ≥ 3 es falso | **La partida sigue** |
+| 2 lobos + 2 aldeanos | un lobo | 3 ≥ 2 | **Ganan los lobos** |
+| 3 lobos + 3 aldeanos | un aldeano | 3 ≥ 4 es falso | **La partida sigue** |
+| 3 lobos + 3 aldeanos | un lobo | 4 ≥ 3 | **Ganan los lobos** |
+| 0 lobos + 0 aldeanos | — | 0 ≥ 0 | **Ganan los lobos** |
+| 0 lobos + 2 aldeanos | cualquiera | 0 ≥ 2 es falso | **Gana el pueblo** |
+
+La comprobación se hace tras cada muerte, no al final de la fase: si el Presidente muere, su voto
+doble desaparece y la cuenta se recalcula al instante.
 
 ## 9. Casos límite
 
@@ -227,13 +258,16 @@ eliminado a todos los lobos). La partida termina en ese instante y se revelan to
 | El Caballero golpea a alguien con vidas | Le quita 1 vida; si llega a 0, muerte definitiva y revelación de rol. |
 | Un enamorado muere | El otro muere al instante, sin tiradas de vidas. |
 | Los enamorados son del mismo bando | Siguen en su bando; el amor solo añade la muerte vinculada. |
-| El Presidente muere | El cargo queda vacío; no hay reelección. |
+| Solo quedan un lobo y un aldeano | Sin Presidente (o con el lobo de Presidente) **ganan los lobos**; si el aldeano es Presidente, la partida sigue (1 < 2). |
+| Solo quedan 2 lobos y 2 aldeanos | Sin Presidente **ganan los lobos** (2 ≥ 2); con un aldeano de Presidente **la partida sigue** (2 < 3); con un lobo de Presidente **ganan los lobos** (3 ≥ 2). |
+| El Presidente muere | El cargo queda vacío, su voto doble desaparece y no hay reelección. |
+| Los dos últimos vivos son enamorados de bandos distintos | Ganan los enamorados, por delante de la paridad. |
 | Todos se abstienen | Nadie es linchado. |
 | Empate en la segunda vuelta | Nadie es linchado. |
 | Empate en la elección de Presidente | Segunda vuelta entre empatados; si persiste, **sorteo** entre ellos. |
 | Un jugador desconectado tiene que votar o actuar | Se omite su acción; en votación cuenta como abstención. |
 | Un jugador muerto intenta actuar o votar | El servidor lo rechaza; los muertos no hablan en el chat público. |
-| Mueren todos a la vez | Gana el pueblo si no queda ningún lobo; si no queda nadie, se aplica ese mismo orden. |
+| Mueren todos a la vez | **Ganan los lobos** por paridad (0 ≥ 0), salvo que los dos últimos fueran enamorados de bandos distintos. |
 
 ## 10. Tiempos por defecto
 
@@ -251,9 +285,8 @@ Los tiempos de rol, debate y votación son configurables por el host dentro de l
 | Segunda vuelta | 30 s | fijo |
 | Caballero al morir | 20 s | fijo |
 
-> **Nota de coherencia:** el código actual usa `debateSeconds = 120` y `roleSeconds = 30` por
-> defecto. Este reglamento propone **240** y **20** respectivamente (D1 y D2). Son cambios de una
-> línea en `GameSettings.DEFAULT`.
+> **Confirmado (D1/D2):** el debate por defecto es **240 s** y la ventana de rol **20 s**.
+> `GameSettings.DEFAULT` se ha actualizado a estos valores.
 
 ## 11. Desconexiones y abandono
 
@@ -274,25 +307,32 @@ Los tiempos de rol, debate y votación son configurables por el host dentro de l
 - **Enamorados**: canal privado entre ellos, siempre (si se confirma en #50).
 - Los mensajes del narrador son del sistema y no se pueden responder.
 
-## 13. Decisiones abiertas
+## 13. Decisiones de diseño (validadas)
 
-Cada punto lleva la opción recomendada. Si no dices lo contrario, el motor implementará esa.
+Todas las decisiones están cerradas. Las que no se mencionaron en la revisión se mantienen en la
+opción recomendada.
 
-| ID | Decisión | Recomendación | Alternativa |
-| -- | -------- | ------------- | ----------- |
-| D1 | Debate por defecto | **240 s** (coherente con #41) | mantener 120 s |
-| D2 | Ventana de acción de rol | **20 s** por defecto | mantener 30 s |
-| D3 | ¿Cuándo se elige al Presidente? | **Antes del reparto**, todos votan sin saber roles | después del reparto |
-| D4 | Voto doble del Presidente | **También en la segunda vuelta** | solo en la primera |
-| D5 | Empate en la segunda vuelta | **Nadie muere** | sorteo entre empatados |
-| D6 | Muerte de un enamorado | **Definitiva**, ignora vidas | pierde todas las vidas |
-| D7 | Revelación de rol al morir de noche | **No se revela**; solo el linchamiento revela | revelar siempre |
-| D8 | Momento del golpe del Caballero | **Al amanecer** si muere de noche; inmediato si muere linchado | elegir de noche y aplicar al amanecer |
-| D9 | Protección del Ángel | **Anula todos** los ataques de lobos/veneno de esa noche | solo el primero |
-| D10 | Pociones de la Bruja | **Una por noche**, cada una una vez | puede usar las dos la misma noche |
-| D11 | Muerte simultánea de último lobo y último aldeano | **Gana el pueblo** | empate |
-| D12 | Muerte del Presidente | **Sin reelección**, cargo vacío | nueva elección al día siguiente |
-| D13 | Salir/expulsar con la partida empezada | **No permitido**; solo desconexión con asiento reservado | permitir abandono (muere) |
+| ID | Decisión | Valor final |
+| -- | -------- | ----------- |
+| D1 | Debate por defecto | **240 s**, con cierre anticipado si **todos** los vivos pulsan «Listo para votar» |
+| D2 | Ventana de acción de rol | **20 s** |
+| D3 | ¿Cuándo se elige al Presidente? | **Antes del reparto**, todos votan sin saber roles |
+| D4 | Voto doble del Presidente | **También en la segunda vuelta** |
+| D5 | Empate en la segunda vuelta | **Nadie muere** |
+| D6 | Muerte de un enamorado | **Definitiva**, ignora vidas |
+| D7 | Revelación de rol al morir de noche | **No se revela**; solo el linchamiento revela |
+| D8 | Momento del golpe del Caballero | **Al amanecer** si muere de noche; inmediato si muere linchado |
+| D9 | Protección del Ángel | **Anula todos** los ataques de lobos/veneno de esa noche |
+| D10 | Pociones de la Bruja | **Una por noche**, cada una una vez por partida |
+| D11 | Victoria de los lobos | **Paridad con voto doble**: ganan si `votosLobos >= votosPueblo`, contando el voto doble del Presidente vivo. Muerte simultánea del último lobo y aldeano → ganan los lobos (0 ≥ 0) |
+| D12 | Muerte del Presidente | **Sin reelección**, cargo vacío |
+| D13 | Salir/expulsar con la partida empezada | **No permitido**; solo desconexión con asiento reservado |
+
+### Cómo se traduce D1 en el juego
+
+El debate dura 240 s como máximo. Cada jugador vivo tiene el botón **«Listo para votar»**; cuando
+**todos** los vivos conectados lo han pulsado, el debate termina y se pasa a la votación. Es el
+mecanismo acordado para acortarlo sin necesidad de configuración extra.
 
 ## 14. Trazabilidad
 
