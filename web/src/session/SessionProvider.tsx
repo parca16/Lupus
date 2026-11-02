@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { GameSettings, Player } from '../protocol'
+import type { GameDawnMessage, GameOverMessage, GameSettings, GameStateMessage, Player } from '../protocol'
 import { LupusSocket } from '../ws/socket'
 import type { SocketStatus } from '../ws/socket'
 import { SessionContext } from './context'
-import type { SessionValue } from './context'
+import type { GameActionOptions, SessionValue } from './context'
 import { clearSession, loadSession, saveSession } from './storage'
 
 type PendingAction =
@@ -38,6 +38,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [playerId, setPlayerId] = useState<string | null>(null)
   const [players, setPlayers] = useState<Player[]>([])
   const [settings, setSettings] = useState<GameSettings | null>(null)
+  const [game, setGame] = useState<GameStateMessage | null>(null)
+  const [dawn, setDawn] = useState<GameDawnMessage | null>(null)
+  const [gameOver, setGameOver] = useState<GameOverMessage | null>(null)
   const [starting, setStarting] = useState(false)
   const [restoring, setRestoring] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -56,6 +59,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setPlayerId(null)
     setPlayers([])
     setSettings(null)
+    setGame(null)
+    setDawn(null)
+    setGameOver(null)
     setStarting(false)
     setRestoring(false)
   }, [])
@@ -146,6 +152,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             case 'game_starting':
               setStarting(true)
               break
+            case 'game_state':
+              setGame(message)
+              setStarting(false)
+              break
+            case 'game_dawn':
+              setDawn(message)
+              break
+            case 'game_over':
+              setGameOver(message)
+              break
             case 'error': {
               const recuperando = resumingRef.current
 
@@ -228,6 +244,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     socketRef.current?.send('start_game', {})
   }, [])
 
+  const gameAction = useCallback((action: string, options: GameActionOptions = {}) => {
+    socketRef.current?.send('game_action', {
+      action,
+      kind: options.kind ?? '',
+      targetId: options.targetId ?? '',
+      secondTargetId: options.secondTargetId ?? '',
+    })
+  }, [])
+
   const leave = useCallback(() => {
     const socket = socketRef.current
     if (socket) {
@@ -254,6 +279,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       playerId,
       players,
       settings,
+      game,
+      dawn,
+      gameOver,
       starting,
       restoring,
       error,
@@ -263,6 +291,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       kickPlayer,
       updateSettings,
       startGame,
+      gameAction,
       leave,
       clearError,
     }),
@@ -273,6 +302,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       playerId,
       players,
       settings,
+      game,
+      dawn,
+      gameOver,
       starting,
       restoring,
       error,
@@ -282,6 +314,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       kickPlayer,
       updateSettings,
       startGame,
+      gameAction,
       leave,
       clearError,
     ],

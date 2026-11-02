@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { SettingsForm } from '../components/SettingsForm'
 import { Button } from '../components/ui/Button'
@@ -56,11 +56,18 @@ export function LobbyScreen() {
     notice,
     settings,
     starting,
+    game,
     updateSettings,
     startGame,
   } = useSession()
   const navigate = useNavigate()
   const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    if (game) {
+      navigate('/game')
+    }
+  }, [game, navigate])
 
   if (!roomCode) {
     return (
