@@ -201,12 +201,64 @@ public final class Game {
 		this.deadline = null;
 	}
 
+	/**
+	 * Aplica un golpe: lobos, veneno de la Bruja, Caballero o linchamiento.
+	 *
+	 * <p>Con vidas restantes se pierde una y se sobrevive; con cero vidas el golpe es muerte
+	 * definitiva.
+	 */
+	public HitResult hit(String playerId) {
+		GamePlayer player = requirePlayer(playerId);
+
+		if (!player.alive()) {
+			return HitResult.ALREADY_DEAD;
+		}
+
+		if (player.lives() > 0) {
+			player.lives(player.lives() - 1);
+			return HitResult.LOST_LIFE;
+		}
+
+		player.alive(false);
+		return HitResult.DIED;
+	}
+
+	/** Restaura una vida sin superar el maximo configurado (pocion de la Bruja). */
+	public boolean heal(String playerId) {
+		GamePlayer player = requirePlayer(playerId);
+
+		if (!player.alive() || player.lives() >= settings.lives()) {
+			return false;
+		}
+
+		player.lives(player.lives() + 1);
+		return true;
+	}
+
+	/** Muerte definitiva que ignora las vidas (muerte de amor de los enamorados). */
+	public boolean kill(String playerId) {
+		GamePlayer player = requirePlayer(playerId);
+
+		if (!player.alive()) {
+			return false;
+		}
+
+		player.lives(0);
+		player.alive(false);
+		return true;
+	}
+
+	public boolean isAlive(String playerId) {
+		return requirePlayer(playerId).alive();
+	}
+
+	public int livesOf(String playerId) {
+		return requirePlayer(playerId).lives();
+	}
+
 	/** Vista de la partida para un jugador; solo incluye su propio rol. */
 	public GameView viewFor(String playerId) {
-		GamePlayer player = players.get(playerId);
-		if (player == null) {
-			throw new IllegalArgumentException("Jugador desconocido: " + playerId);
-		}
+		GamePlayer player = requirePlayer(playerId);
 
 		List<GameView.PublicPlayer> publicPlayers = players.values().stream()
 				.map(other -> new GameView.PublicPlayer(other.id(), other.nickname(), other.lives(),
@@ -215,6 +267,14 @@ public final class Game {
 
 		return new GameView(roomCode, phase, round, nightStep, deadline, player.id(), player.role(),
 				player.lives(), player.alive(), player.president(), publicPlayers);
+	}
+
+	private GamePlayer requirePlayer(String playerId) {
+		GamePlayer player = players.get(playerId);
+		if (player == null) {
+			throw new IllegalArgumentException("Jugador desconocido: " + playerId);
+		}
+		return player;
 	}
 
 	private void begin(Phase next, Instant now) {
