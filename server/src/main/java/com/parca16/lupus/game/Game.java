@@ -41,6 +41,8 @@ public final class Game {
 	private final Map<String, Integer> livesAtNightStart = new LinkedHashMap<>();
 	private final Map<String, Boolean> aliveAtNightStart = new LinkedHashMap<>();
 	private final Set<String> readyToVote = new LinkedHashSet<>();
+	private final Map<String, Vote> votes = new LinkedHashMap<>();
+	private final List<String> runoffCandidates = new ArrayList<>();
 
 	private Phase phase;
 	private NightStep nightStep;
@@ -48,6 +50,8 @@ public final class Game {
 	private int round;
 	private String presidentId;
 	private Outcome outcome;
+	private VoteResult lastVoteResult;
+	private LynchResult lastLynch;
 	private String wolfTargetId;
 	private String seerTargetId;
 	private NightResult lastNight;
@@ -215,7 +219,10 @@ public final class Game {
 				NightStep next = nextStep(nightStep);
 				if (next == null) {
 					resolveNight();
-					begin(Phase.DAWN, now);
+					checkVictory();
+					if (!finished()) {
+						begin(Phase.DAWN, now);
+					}
 				}
 				else {
 					nightStep = next;
@@ -224,14 +231,7 @@ public final class Game {
 			}
 			case DAWN -> begin(Phase.DEBATE, now);
 			case DEBATE -> begin(Phase.VOTING, now);
-			case VOTING -> {
-				round++;
-				begin(Phase.NIGHT, now);
-			}
-			case RUNOFF -> {
-				round++;
-				begin(Phase.NIGHT, now);
-			}
+			case VOTING, RUNOFF -> closeVoting(now);
 			case FINISHED -> throw new IllegalStateException("La partida ya ha terminado");
 		}
 	}
@@ -395,6 +395,180 @@ public final class Game {
 				.filter(player -> player != null && player.alive())
 				.count();
 		return ready >= alive;
+	}
+
+	/**
+	 * Voto secreto durante la votacion o la segunda vuelta.
+	 *
+	 * @param targetId jugador votado; {@code null} es abstencion
+	 */
+	public void submitVote(String voterId, String targetId) {
+		if (phase != Phase.VOTING && phase != Phase.RUNOFF) {
+			throw new GameRuleException(GameRuleException.NOT_YOUR_TURN, "No hay votacion en curso.");
+		}
+
+		GamePlayer voter = requirePlayer(voterId);
+		if (!voter.alive()) {
+			throw new GameRuleException(GameRuleException.NOT_ALIVE, "Los muertos no votan.");
+		}
+
+		if (targetId != null) {
+			GamePlayer target = players.get(targetId);
+			boolean validTarget = target != null && target.alive() && !targetId.equals(voterId);
+			if (!validTarget) {
+				throw new GameRuleException(GameRuleException.INVALID_TARGET, "Objetivo de voto invalido.");
+			}
+			if (phase == Phase.RUNOFF && !runoffCandidates.contains(targetId)) {
+				throw new GameRuleException(GameRuleException.INVALID_TARGET,
+						"En la segunda vuelta solo se puede votar a los empatados.");
+			}
+		}
+
+		votes.put(voterId, new Vote(voterId, targetId));
+
+		if (allVotesSubmitted()) {
+			closeVoting(clock.instant());
+		}
+	}
+
+	public Optional<Vote> voteOf(String voterId) {
+		requirePlayer(voterId);
+		return Optional.ofNullable(votes.get(voterId));
+	}
+
+	public boolean allVotesSubmitted() {
+		long alive = players.values().stream().filter(GamePlayer::alive).count();
+		return alive > 0 && votes.size() >= alive;
+	}
+
+	/**
+	 * Cierra la votacion: cuenta, decide si hay segunda vuelta y aplica el linchamiento.
+	 *
+	 * <p>La llamada elige sola cuando votan todos (o expira el plazo). Tambien se puede forzar para
+	 * el cierre por tiempo.
+	 */
+	public VoteResult closeVoting(Instant now) {
+		if (phase != Phase.VOTING && phase != Phase.RUNOFF) {
+			throw new GameRuleException(GameRuleException.NOT_YOUR_TURN, "No hay votacion en curso.");
+		}
+
+		boolean runoff = phase == Phase.RUNOFF;
+		VoteResult result = contarVotos(runoff);
+		this.lastVoteResult = result;
+
+		if (result.runoffNeeded()) {
+			runoffCandidates.clear();
+			runoffCandidates.addAll(result.tied());
+			begin(Phase.RUNOFF, now);
+			return result;
+		}
+
+		runoffCandidates.clear();
+		applyLynch(result.lynchedId());
+		checkVictory();
+
+		if (!finished()) {
+			round++;
+			begin(Phase.NIGHT, now);
+		}
+
+		return result;
+	}
+
+	public VoteResult lastVoteResult() {
+		return lastVoteResult;
+	}
+
+	public LynchResult lastLynch() {
+		return lastLynch;
+	}
+
+	public List<String> runoffCandidates() {
+		return List.copyOf(runoffCandidates);
+	}
+
+	/**
+	 * Comprueba la victoria segun el reglamento: enamorados (cuando exista #50) -> lobos por
+	 * paridad con voto doble del Presidente -> pueblo.
+	 */
+	public Outcome checkVictory() {
+		if (finished()) {
+			return outcome;
+		}
+
+		List<GamePlayer> vivos = players.values().stream().filter(GamePlayer::alive).toList();
+		long lobos = vivos.stream().filter(player -> player.role() == Role.WOLF).count();
+		long noLobos = vivos.size() - lobos;
+
+		GamePlayer presidente = vivos.stream().filter(GamePlayer::president).findFirst().orElse(null);
+		long votosLobos = lobos + (presidente != null && presidente.role() == Role.WOLF ? 1 : 0);
+		long votosPueblo = noLobos + (presidente != null && presidente.role() != Role.WOLF ? 1 : 0);
+
+		if (votosLobos >= votosPueblo) {
+			finish(Outcome.WOLVES);
+			return Outcome.WOLVES;
+		}
+		if (lobos == 0) {
+			finish(Outcome.VILLAGE);
+			return Outcome.VILLAGE;
+		}
+
+		return null;
+	}
+
+	private VoteResult contarVotos(boolean runoff) {
+		Map<String, Integer> counts = new LinkedHashMap<>();
+		int abstenciones = 0;
+
+		for (Vote vote : votes.values()) {
+			if (vote.targetId() == null) {
+				abstenciones++;
+				continue;
+			}
+			int peso = isPresident(vote.voterId()) ? 2 : 1;
+			counts.merge(vote.targetId(), peso, Integer::sum);
+		}
+
+		List<String> tied = new ArrayList<>();
+		String lynched = null;
+		boolean runoffNeeded = false;
+
+		if (!counts.isEmpty()) {
+			int max = counts.values().stream().mapToInt(Integer::intValue).max().orElse(0);
+			tied = counts.entrySet().stream()
+					.filter(entry -> entry.getValue() == max)
+					.map(Map.Entry::getKey)
+					.toList();
+
+			if (tied.size() == 1) {
+				lynched = tied.get(0);
+			}
+			else if (!runoff) {
+				runoffNeeded = true;
+			}
+		}
+
+		List<Vote> details = settings.showVoteDetail() ? List.copyOf(votes.values()) : List.of();
+		return new VoteResult(lynched, runoffNeeded, tied, counts, details, abstenciones);
+	}
+
+	private void applyLynch(String targetId) {
+		if (targetId == null) {
+			lastLynch = new LynchResult(null, false, false, null, null);
+			return;
+		}
+
+		HitResult result = hit(targetId);
+		GamePlayer target = requirePlayer(targetId);
+		boolean died = result == HitResult.DIED;
+
+		lastLynch = new LynchResult(targetId, result == HitResult.LOST_LIFE, died,
+				died ? target.role() : null, result);
+	}
+
+	private boolean isPresident(String playerId) {
+		GamePlayer player = players.get(playerId);
+		return player != null && player.alive() && player.president();
 	}
 
 	/** True si el actor (o todos los lobos) ya han actuado en el paso actual. */
@@ -657,8 +831,17 @@ public final class Game {
 				readyToVote.clear();
 				this.deadline = now.plusSeconds(settings.debateSeconds());
 			}
-			case VOTING -> this.deadline = now.plusSeconds(settings.voteSeconds());
-			case RUNOFF -> this.deadline = now.plus(RUNOFF_TIME);
+			case VOTING -> {
+				votes.clear();
+				runoffCandidates.clear();
+				lastVoteResult = null;
+				lastLynch = null;
+				this.deadline = now.plusSeconds(settings.voteSeconds());
+			}
+			case RUNOFF -> {
+				votes.clear();
+				this.deadline = now.plus(RUNOFF_TIME);
+			}
 			case FINISHED -> this.deadline = null;
 		}
 	}
