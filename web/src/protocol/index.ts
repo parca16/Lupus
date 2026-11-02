@@ -64,6 +64,11 @@ export interface RoomStateMessage extends Envelope<'room_state'> {
   players: Player[]
 }
 
+export interface ResumeRoomMessage extends Envelope<'resume_room'> {
+  roomCode: string
+  playerId: string
+}
+
 export interface RoomUpdatedMessage extends Envelope<'room_updated'> {
   roomCode: string
   players: Player[]
@@ -121,6 +126,7 @@ export type Message =
   | ErrorMessage
   | CreateRoomMessage
   | JoinRoomMessage
+  | ResumeRoomMessage
   | RoomStateMessage
   | RoomUpdatedMessage
   | LeaveRoomMessage
@@ -149,6 +155,7 @@ export const MESSAGE_FIELDS: Record<MessageType, Record<string, FieldKind>> = {
   error: { code: 'string', message: 'string' },
   create_room: { nickname: 'string' },
   join_room: { roomCode: 'string', nickname: 'string' },
+  resume_room: { roomCode: 'string', playerId: 'string' },
   room_state: { roomCode: 'string', playerId: 'string', players: 'array' },
   room_updated: { roomCode: 'string', players: 'array' },
   leave_room: {},

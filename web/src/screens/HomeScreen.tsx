@@ -13,7 +13,7 @@ const NICKNAME_MAX = 16
 const CODE_LENGTH = 6
 
 export function HomeScreen() {
-  const { createRoom, joinRoom, status, error, roomCode, clearError } = useSession()
+  const { createRoom, joinRoom, status, error, notice, restoring, roomCode, clearError } = useSession()
   const navigate = useNavigate()
 
   const [mode, setMode] = useState<Mode>('create')
@@ -28,6 +28,15 @@ export function HomeScreen() {
       navigate('/lobby')
     }
   }, [roomCode, navigate])
+
+  if (restoring) {
+    return (
+      <Card className="text-center">
+        <h2 className="mb-2 text-2xl font-semibold">Recuperando tu sala…</h2>
+        <p className="text-sm text-parchment/60">Reconectando con tu asiento.</p>
+      </Card>
+    )
+  }
 
   function cambiarModo(next: Mode) {
     setMode(next)
@@ -64,6 +73,15 @@ export function HomeScreen() {
 
   return (
     <div className="flex flex-col gap-6">
+      {notice ? (
+        <p
+          role="status"
+          className="rounded-lg border border-night-700 bg-night-800/60 px-3 py-2 text-sm text-parchment/80"
+        >
+          {notice}
+        </p>
+      ) : null}
+
       <div className="flex flex-col gap-2 text-center">
         <h2 className="text-3xl font-semibold tracking-tight">Entra en la partida</h2>
         <p className="text-sm text-parchment/60">

@@ -10,6 +10,7 @@ export interface SessionValue {
   players: Player[]
   settings: GameSettings | null
   starting: boolean
+  restoring: boolean
   error: string | null
   notice: string | null
   createRoom: (nickname: string) => void

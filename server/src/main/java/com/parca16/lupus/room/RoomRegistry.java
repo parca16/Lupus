@@ -1,8 +1,14 @@
 package com.parca16.lupus.room;
 
 import java.security.SecureRandom;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -18,6 +24,11 @@ public class RoomRegistry {
 
 	private final Map<String, Room> rooms = new ConcurrentHashMap<>();
 	private final SecureRandom random = new SecureRandom();
+	private final Clock clock;
+
+	public RoomRegistry(Clock clock) {
+		this.clock = Objects.requireNonNull(clock, "clock");
+	}
 
 	/** Crea una sala nueva con codigo unico. */
 	public Room create() {
@@ -27,7 +38,7 @@ public class RoomRegistry {
 	public Room create(RoomCapacity capacity) {
 		for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
 			String code = generateCode();
-			Room room = new Room(code, capacity);
+			Room room = new Room(code, capacity, clock);
 			if (rooms.putIfAbsent(code, room) == null) {
 				return room;
 			}
@@ -46,6 +57,24 @@ public class RoomRegistry {
 		if (code != null) {
 			rooms.remove(normalize(code));
 		}
+	}
+
+	/**
+	 * Saca del registro las salas sin actividad durante {@code ttl} y las devuelve.
+	 *
+	 * <p>El borrado es atomico con la comprobacion: si una sala recibe actividad entre medias,
+	 * no se elimina.
+	 */
+	public List<Room> removeExpired(Instant now, Duration ttl) {
+		List<Room> removed = new ArrayList<>();
+
+		for (Room room : rooms.values()) {
+			if (room.expired(now, ttl) && rooms.remove(room.code(), room)) {
+				removed.add(room);
+			}
+		}
+
+		return removed;
 	}
 
 	public int size() {

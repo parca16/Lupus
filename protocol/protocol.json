@@ -122,9 +122,25 @@
         "nickname": "Luis"
       }
     },
+    "resume_room": {
+      "direction": "c2s",
+      "summary": "Recupera el asiento de un jugador usando su identidad persistente (playerId).",
+      "fields": {
+        "roomCode": "string",
+        "playerId": "string"
+      },
+      "example": {
+        "v": 1,
+        "type": "resume_room",
+        "id": "00000000-0000-0000-0000-000000000019",
+        "at": 1700000000650,
+        "roomCode": "ABC234",
+        "playerId": "00000000-0000-0000-0000-0000000000cc"
+      }
+    },
     "room_state": {
       "direction": "s2c",
-      "summary": "Respuesta a create_room y join_room: la sala y quién eres en ella.",
+      "summary": "Respuesta a create_room, join_room y resume_room: la sala y quién eres en ella.",
       "fields": {
         "roomCode": "string",
         "playerId": "string",

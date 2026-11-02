@@ -25,6 +25,7 @@ public final class Protocol {
 			Map.entry("error", ErrorMessage.class),
 			Map.entry("create_room", CreateRoom.class),
 			Map.entry("join_room", JoinRoom.class),
+			Map.entry("resume_room", ResumeRoom.class),
 			Map.entry("room_state", RoomState.class),
 			Map.entry("room_updated", RoomUpdated.class),
 			Map.entry("leave_room", LeaveRoom.class),

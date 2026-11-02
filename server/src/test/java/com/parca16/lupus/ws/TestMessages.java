@@ -8,6 +8,7 @@ import com.parca16.lupus.protocol.KickPlayer;
 import com.parca16.lupus.protocol.LeaveRoom;
 import com.parca16.lupus.protocol.Message;
 import com.parca16.lupus.protocol.Protocol;
+import com.parca16.lupus.protocol.ResumeRoom;
 
 /** Constructores de mensajes para los tests de integracion. */
 final class TestMessages {
@@ -22,6 +23,11 @@ final class TestMessages {
 	static Message unirse(String roomCode, String nickname) {
 		return new JoinRoom(Protocol.VERSION, UUID.randomUUID().toString(), System.currentTimeMillis(), roomCode,
 				nickname);
+	}
+
+	static Message reanudar(String roomCode, String playerId) {
+		return new ResumeRoom(Protocol.VERSION, UUID.randomUUID().toString(), System.currentTimeMillis(), roomCode,
+				playerId);
 	}
 
 	static Message salir() {

@@ -97,7 +97,7 @@ class WebSocketLobbyTest {
 
 			try (TestClient reconectado = new TestClient(port)) {
 				reconectado.nextOfType("welcome");
-				reconectado.send(TestMessages.unirse(code, "Luis"));
+				reconectado.send(TestMessages.reanudar(code, playerId));
 
 				JsonNode estado = reconectado.nextOfType("room_state");
 				assertEquals(playerId, estado.get("playerId").asString(), "Debe recuperar el mismo asiento");
@@ -113,7 +113,9 @@ class WebSocketLobbyTest {
 	void siElHostSeDesconectaLaSalaSigueAbiertaParaQuePuedaVolver() throws Exception {
 		try (TestClient invitado = new TestClient(port)) {
 			TestClient host = new TestClient(port);
-			String code = crearSala(host);
+			JsonNode estadoHost = crearSalaCompleta(host);
+			String code = estadoHost.get("roomCode").asString();
+			String hostId = estadoHost.get("playerId").asString();
 			unirse(code, "Luis", invitado);
 
 			host.close();
@@ -124,7 +126,7 @@ class WebSocketLobbyTest {
 
 			try (TestClient hostDeVuelta = new TestClient(port)) {
 				hostDeVuelta.nextOfType("welcome");
-				hostDeVuelta.send(TestMessages.unirse(code, "Ana"));
+				hostDeVuelta.send(TestMessages.reanudar(code, hostId));
 
 				JsonNode estado = hostDeVuelta.nextOfType("room_state");
 				assertTrue(estado.get("players").get(0).get("host").asBoolean(),
@@ -133,10 +135,39 @@ class WebSocketLobbyTest {
 		}
 	}
 
-	private String crearSala(TestClient host) throws Exception {
+	@Test
+	void noSePuedeReanudarUnAsientoQueYaEstaConectado() throws Exception {
+		try (TestClient host = new TestClient(port); TestClient invitado = new TestClient(port);
+				TestClient otraPestana = new TestClient(port)) {
+			String code = crearSala(host);
+			String playerId = unirse(code, "Luis", invitado).get("playerId").asString();
+
+			otraPestana.nextOfType("welcome");
+			otraPestana.send(TestMessages.reanudar(code, playerId));
+
+			assertEquals("already_connected", otraPestana.nextOfType("error").get("code").asString());
+		}
+	}
+
+	@Test
+	void reanudarUnAsientoInexistenteDevuelveSeatNotFound() throws Exception {
+		try (TestClient host = new TestClient(port)) {
+			String code = crearSala(host);
+
+			host.send(TestMessages.reanudar(code, "no-existe"));
+
+			assertEquals("seat_not_found", host.nextOfType("error").get("code").asString());
+		}
+	}
+
+	private JsonNode crearSalaCompleta(TestClient host) throws Exception {
 		host.nextOfType("welcome");
 		host.send(TestMessages.crear("Ana"));
-		return host.nextOfType("room_state").get("roomCode").asString();
+		return host.nextOfType("room_state");
+	}
+
+	private String crearSala(TestClient host) throws Exception {
+		return crearSalaCompleta(host).get("roomCode").asString();
 	}
 
 	private JsonNode unirse(String code, String nickname, TestClient cliente) throws Exception {
