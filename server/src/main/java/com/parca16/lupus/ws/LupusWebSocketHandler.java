@@ -5,6 +5,9 @@ import static com.parca16.lupus.ws.SessionAttributes.NICKNAME;
 import static com.parca16.lupus.ws.SessionAttributes.PLAYER_ID;
 import static com.parca16.lupus.ws.SessionAttributes.ROOM_CODE;
 
+import java.time.Clock;
+import java.util.List;
+import java.util.Random;
 import java.util.UUID;
 
 import org.springframework.stereotype.Component;
@@ -13,9 +16,21 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
+import com.parca16.lupus.game.CupidAction;
+import com.parca16.lupus.game.Game;
+import com.parca16.lupus.game.GameParticipant;
+import com.parca16.lupus.game.GameRegistry;
+import com.parca16.lupus.game.GameRuleException;
+import com.parca16.lupus.game.GuardianAction;
+import com.parca16.lupus.game.NightAction;
+import com.parca16.lupus.game.SeerAction;
+import com.parca16.lupus.game.WitchAction;
+import com.parca16.lupus.game.WitchPotion;
+import com.parca16.lupus.game.WolfVote;
 import com.parca16.lupus.protocol.CreateRoom;
 import com.parca16.lupus.protocol.Echo;
 import com.parca16.lupus.protocol.ErrorMessage;
+import com.parca16.lupus.protocol.GameAction;
 import com.parca16.lupus.protocol.GameStarting;
 import com.parca16.lupus.protocol.Hello;
 import com.parca16.lupus.protocol.JoinRoom;
@@ -51,11 +66,18 @@ public class LupusWebSocketHandler extends TextWebSocketHandler {
 	private final RoomRegistry rooms;
 	private final PlayerSessions sessions;
 	private final RoomNotifier notifier;
+	private final GameRegistry games;
+	private final GameBroadcaster broadcaster;
+	private final Clock clock;
 
-	public LupusWebSocketHandler(RoomRegistry rooms, PlayerSessions sessions, RoomNotifier notifier) {
+	public LupusWebSocketHandler(RoomRegistry rooms, PlayerSessions sessions, RoomNotifier notifier,
+			GameRegistry games, GameBroadcaster broadcaster, Clock clock) {
 		this.rooms = rooms;
 		this.sessions = sessions;
 		this.notifier = notifier;
+		this.games = games;
+		this.broadcaster = broadcaster;
+		this.clock = clock;
 	}
 
 	@Override
@@ -124,6 +146,9 @@ public class LupusWebSocketHandler extends TextWebSocketHandler {
 		catch (RoomException exception) {
 			sendError(session, exception.code(), exception.getMessage());
 		}
+		catch (GameRuleException exception) {
+			sendError(session, exception.code(), exception.getMessage());
+		}
 	}
 
 	/** Cualquier mensaje de un jugador de la sala cuenta como actividad (issue #25). */
@@ -151,6 +176,7 @@ public class LupusWebSocketHandler extends TextWebSocketHandler {
 			case KickPlayer kickPlayer -> expulsar(session, kickPlayer);
 			case UpdateSettings updateSettings -> actualizarConfiguracion(session, updateSettings);
 			case StartGame ignored -> empezarPartida(session);
+			case GameAction gameAction -> ejecutarAccion(session, gameAction);
 			default -> sendError(session, "unknown_type", "Mensaje no admitido del cliente.");
 		}
 	}
@@ -192,6 +218,7 @@ public class LupusWebSocketHandler extends TextWebSocketHandler {
 		sendRoomState(session, room, player);
 		sendRoomSettings(session, room);
 		notifier.broadcastPlayers(room, player.id());
+		games.find(room.code()).ifPresent(game -> broadcaster.sendState(game, player.id()));
 	}
 
 	private void actualizarConfiguracion(WebSocketSession session, UpdateSettings message) {
@@ -215,18 +242,35 @@ public class LupusWebSocketHandler extends TextWebSocketHandler {
 		if (!room.isHost(jugadorActual(session))) {
 			throw new RoomException(RoomException.NOT_HOST, "Solo el host puede empezar la partida.");
 		}
+		if (games.find(room.code()).isPresent()) {
+			throw new RoomException(RoomException.GAME_ALREADY_STARTED, "La partida ya ha empezado.");
+		}
 
 		int conectados = (int) room.players().stream().filter(RoomPlayer::connected).count();
 		room.gameSettings().validatedForStart(conectados);
+
+		List<GameParticipant> participants = room.players().stream()
+				.filter(RoomPlayer::connected)
+				.map(player -> new GameParticipant(player.id(), player.nickname()))
+				.toList();
+
+		Game game = Game.start(room.code(), room.gameSettings(), participants, clock, new Random());
+		games.put(game);
 		room.state(GameState.STARTING);
 
 		notifier.broadcastAll(room, new GameStarting(Protocol.VERSION, UUID.randomUUID().toString(),
 				System.currentTimeMillis(), room.code()));
+		broadcaster.broadcastState(game);
 	}
 
 	private void salirDeSala(WebSocketSession session) {
 		Room room = salaActual(session);
 		String playerId = jugadorActual(session);
+
+		if (games.find(room.code()).isPresent()) {
+			throw new RoomException(RoomException.GAME_ALREADY_STARTED,
+					"No se puede salir con la partida en curso.");
+		}
 
 		if (room.isHost(playerId)) {
 			notifier.close(room, RoomNotifier.HOST_LEFT, playerId);
@@ -244,6 +288,11 @@ public class LupusWebSocketHandler extends TextWebSocketHandler {
 	private void expulsar(WebSocketSession session, KickPlayer message) {
 		Room room = salaActual(session);
 		String playerId = jugadorActual(session);
+
+		if (games.find(room.code()).isPresent()) {
+			throw new RoomException(RoomException.GAME_ALREADY_STARTED,
+					"No se puede expulsar con la partida en curso.");
+		}
 
 		if (!room.isHost(playerId)) {
 			throw new RoomException(RoomException.NOT_HOST, "Solo el host puede expulsar jugadores.");
@@ -310,5 +359,51 @@ public class LupusWebSocketHandler extends TextWebSocketHandler {
 	private void sendError(WebSocketSession session, String code, String message) {
 		notifier.send(session, new ErrorMessage(Protocol.VERSION, UUID.randomUUID().toString(),
 				System.currentTimeMillis(), code, message));
+	}
+
+	private void ejecutarAccion(WebSocketSession session, GameAction message) {
+		Room room = salaActual(session);
+		Game game = games.find(room.code()).orElseThrow(
+				() -> new RoomException(RoomException.NOT_IN_ROOM, "No hay partida en curso."));
+		String playerId = jugadorActual(session);
+
+		String target = emptyToNull(message.targetId());
+
+		switch (message.action()) {
+			case "president_vote" -> game.submitPresidentVote(playerId, target);
+			case "ready" -> game.markReadyToVote(playerId);
+			case "vote" -> game.submitVote(playerId, target);
+			case "knight_choice" -> game.chooseKnightTarget(playerId, target);
+			case "night_action" -> game.submitNightAction(playerId, nightAction(message, target));
+			default -> throw new GameRuleException(GameRuleException.INVALID_ACTION, "Accion desconocida.");
+		}
+
+		broadcaster.broadcastState(game);
+
+		if (game.finished()) {
+			broadcaster.broadcastOver(game);
+			games.remove(room.code());
+			room.state(GameState.FINISHED);
+		}
+	}
+
+	private static NightAction nightAction(GameAction message, String target) {
+		String second = emptyToNull(message.secondTargetId());
+
+		return switch (message.kind()) {
+			case "seer" -> new SeerAction(target);
+			case "guardian" -> new GuardianAction(target);
+			case "wolf_vote" -> new WolfVote(target);
+			case "witch_heal" -> new WitchAction(WitchPotion.HEAL, target);
+			case "witch_poison" -> new WitchAction(WitchPotion.POISON, target);
+			case "witch_none" -> new WitchAction(WitchPotion.NONE, null);
+			case "cupid" -> new CupidAction(target, second);
+			default -> throw new GameRuleException(GameRuleException.INVALID_ACTION,
+					"Accion de noche desconocida.");
+		};
+	}
+
+	private static String emptyToNull(String value) {
+		return value == null || value.isBlank() ? null : value;
 	}
 }

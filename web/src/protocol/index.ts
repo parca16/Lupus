@@ -117,6 +117,50 @@ export interface GameStartingMessage extends Envelope<'game_starting'> {
   roomCode: string
 }
 
+/** Estado público de un jugador durante la partida. */
+export interface GameStatus {
+  id: string
+  nickname: string
+  lives: number
+  alive: boolean
+  president: boolean
+}
+
+export interface GameStateMessage extends Envelope<'game_state'> {
+  roomCode: string
+  phase: string
+  round: number
+  deadline: number
+  nightStep: string
+  role: string
+  loverId: string
+  vision: string
+  witchVictim: string
+  pendingKnight: string
+  ready: string[]
+  statuses: GameStatus[]
+}
+
+export interface GameDawnMessage extends Envelope<'game_dawn'> {
+  roomCode: string
+  died: string[]
+  lostLife: string[]
+  healed: string[]
+  quiet: boolean
+}
+
+export interface GameOverMessage extends Envelope<'game_over'> {
+  roomCode: string
+  outcome: string
+}
+
+export interface GameActionMessage extends Envelope<'game_action'> {
+  action: string
+  kind: string
+  targetId: string
+  secondTargetId: string
+}
+
 export type Message =
   | HelloMessage
   | WelcomeMessage
@@ -137,6 +181,10 @@ export type Message =
   | RoomSettingsMessage
   | StartGameMessage
   | GameStartingMessage
+  | GameStateMessage
+  | GameDawnMessage
+  | GameOverMessage
+  | GameActionMessage
 
 export type MessageType = Message['type']
 
@@ -185,6 +233,29 @@ export const MESSAGE_FIELDS: Record<MessageType, Record<string, FieldKind>> = {
   },
   start_game: {},
   game_starting: { roomCode: 'string' },
+  game_state: {
+    roomCode: 'string',
+    phase: 'string',
+    round: 'number',
+    deadline: 'number',
+    nightStep: 'string',
+    role: 'string',
+    loverId: 'string',
+    vision: 'string',
+    witchVictim: 'string',
+    pendingKnight: 'string',
+    ready: 'array',
+    statuses: 'array',
+  },
+  game_dawn: {
+    roomCode: 'string',
+    died: 'array',
+    lostLife: 'array',
+    healed: 'array',
+    quiet: 'boolean',
+  },
+  game_over: { roomCode: 'string', outcome: 'string' },
+  game_action: { action: 'string', kind: 'string', targetId: 'string', secondTargetId: 'string' },
 }
 
 export const MESSAGE_TYPES = Object.keys(MESSAGE_FIELDS) as MessageType[]
@@ -225,6 +296,17 @@ export function isPlayer(value: unknown): value is Player {
     typeof value.nickname === 'string' &&
     typeof value.host === 'boolean' &&
     typeof value.connected === 'boolean'
+  )
+}
+
+export function isGameStatus(value: unknown): value is GameStatus {
+  return (
+    isRecord(value) &&
+    typeof value.id === 'string' &&
+    typeof value.nickname === 'string' &&
+    typeof value.lives === 'number' &&
+    typeof value.alive === 'boolean' &&
+    typeof value.president === 'boolean'
   )
 }
 
@@ -270,6 +352,19 @@ export function isMessage(value: unknown): value is Message {
     const roles = value.roles as unknown[]
     if (!roles.every((role) => typeof role === 'string' && (ROLES as readonly string[]).includes(role))) {
       return false
+    }
+  }
+
+  if ('statuses' in value && !(value.statuses as unknown[]).every(isGameStatus)) {
+    return false
+  }
+
+  for (const arrayField of ['ready', 'died', 'lostLife', 'healed'] as const) {
+    if (arrayField in value) {
+      const items = value[arrayField]
+      if (!Array.isArray(items) || !items.every((item) => typeof item === 'string')) {
+        return false
+      }
     }
   }
 

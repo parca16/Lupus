@@ -53,6 +53,10 @@ Ejemplo:
 | `room_settings` | servidor → cliente | `roomCode` + los mismos campos | Configuración vigente (al crear, al entrar y al cambiarla). |
 | `start_game` | cliente → servidor | — | El host arranca la partida. |
 | `game_starting` | servidor → cliente | `roomCode` | La partida empieza. |
+| `game_state` | servidor → cliente | `roomCode`, `phase`, `round`, `deadline`, `nightStep`, `role`, `loverId`, `vision`, `witchVictim`, `pendingKnight`, `ready`, `statuses` | Estado personalizado: tu rol privado y el estado público. |
+| `game_dawn` | servidor → cliente | `roomCode`, `died`, `lostLife`, `healed`, `quiet` | Parte del amanecer. |
+| `game_over` | servidor → cliente | `roomCode`, `outcome` | Fin de la partida. |
+| `game_action` | cliente → servidor | `action`, `kind`, `targetId`, `secondTargetId` | Acción de partida (voto, noche, listo…). |
 
 El objeto `Player` que viaja dentro de `players` tiene esta forma:
 
@@ -182,6 +186,14 @@ Códigos de error previstos:
 | `not_enough_players` | Hacen falta al menos 5 jugadores conectados para empezar. |
 | `invalid_settings_for_players` | Con ese número de jugadores no caben las cartas elegidas. |
 | `game_already_started` | La partida ya ha empezado y no admite jugadores nuevos. |
+| `not_your_turn` | No es tu turno o no hay votación en curso. |
+| `not_alive` | Los muertos no actúan ni votan. |
+| `invalid_target` | Objetivo inválido para esa acción. |
+| `already_acted` | Ya has actuado en esta ventana. |
+| `guardian_limit` | El Ángel ya usó sus 3 protecciones. |
+| `repeated_target` | No se puede repetir objetivo en noches consecutivas. |
+| `no_potions_left` | La poción ya se ha usado. |
+| `invalid_action` | Acción desconocida para esa fase. |
 | `seat_not_found` | Ese asiento ya no existe en la sala. |
 | `already_connected` | Ese jugador ya está conectado (por ejemplo, en otra pestaña). |
 
@@ -257,6 +269,25 @@ emite `game_starting` a todos. Solo el host puede cambiar la configuración o em
   `reason: "inactivity"`.
 - Se puede ajustar en el servidor con `lupus.rooms.expiration-millis` (por defecto `1800000`) y
   `lupus.rooms.sweep-millis` (por defecto `60000`).
+
+## Partida en curso
+
+`start_game` crea la partida en el servidor y reparte los roles. A partir de ahí:
+
+- Cada jugador recibe un **`game_state` personalizado** con la fase, la ronda, el plazo
+  (`deadline` en milisegundos), su **rol privado**, su enamorado si lo tiene, la visión del Vidente,
+  la víctima que ve la Bruja, el Caballero pendiente y el estado público de todos.
+- Los cambios de fase los difunde el ticker del servidor. Los clientes no avanzan nada por su cuenta.
+- Las acciones viajan en `game_action`:
+  - `president_vote` y `vote`: `targetId` (vacío = abstención).
+  - `ready`: botón «Listo para votar».
+  - `knight_choice`: `targetId` del golpe.
+  - `night_action` + `kind`: `seer`, `guardian`, `wolf_vote`, `witch_heal`, `witch_poison`,
+    `witch_none` o `cupid` (con `targetId` y `secondTargetId`).
+- Al amanecer se envía `game_dawn` con las muertes, vidas perdidas y curaciones.
+- Al terminar se envía `game_over` con el bando ganador (`VILLAGE`, `WOLVES` o `LOVERS`).
+- Con la partida en curso no se puede salir ni expulsar (`game_already_started`): solo desconectarse,
+  que conserva el asiento.
 
 ## Cómo se mantiene sincronizado
 

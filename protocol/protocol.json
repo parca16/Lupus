@@ -314,6 +314,108 @@
         "at": 1700000001600,
         "roomCode": "ABC234"
       }
+    },
+    "game_state": {
+      "direction": "s2c",
+      "summary": "Estado personalizado: fase, plazos, tu rol privado y el estado público.",
+      "fields": {
+        "roomCode": "string",
+        "phase": "string",
+        "round": "number",
+        "deadline": "number",
+        "nightStep": "string",
+        "role": "string",
+        "loverId": "string",
+        "vision": "string",
+        "witchVictim": "string",
+        "pendingKnight": "string",
+        "ready": "array",
+        "statuses": "array"
+      },
+      "example": {
+        "v": 1,
+        "type": "game_state",
+        "id": "00000000-0000-0000-0000-000000000019",
+        "at": 1700000001700,
+        "roomCode": "ABC234",
+        "phase": "NIGHT",
+        "round": 1,
+        "deadline": 1700000003720,
+        "nightStep": "SEER",
+        "role": "SEER",
+        "loverId": "",
+        "vision": "",
+        "witchVictim": "",
+        "pendingKnight": "",
+        "ready": [],
+        "statuses": [
+          {
+            "id": "00000000-0000-0000-0000-0000000000bb",
+            "nickname": "Ana",
+            "lives": 1,
+            "alive": true,
+            "president": false
+          }
+        ]
+      }
+    },
+    "game_dawn": {
+      "direction": "s2c",
+      "summary": "Parte del amanecer: muertes, vidas perdidas y curaciones.",
+      "fields": {
+        "roomCode": "string",
+        "died": "array",
+        "lostLife": "array",
+        "healed": "array",
+        "quiet": "boolean"
+      },
+      "example": {
+        "v": 1,
+        "type": "game_dawn",
+        "id": "00000000-0000-0000-0000-000000000020",
+        "at": 1700000004000,
+        "roomCode": "ABC234",
+        "died": ["00000000-0000-0000-0000-0000000000cc"],
+        "lostLife": [],
+        "healed": [],
+        "quiet": false
+      }
+    },
+    "game_over": {
+      "direction": "s2c",
+      "summary": "Fin de la partida con el bando ganador.",
+      "fields": {
+        "roomCode": "string",
+        "outcome": "string"
+      },
+      "example": {
+        "v": 1,
+        "type": "game_over",
+        "id": "00000000-0000-0000-0000-000000000021",
+        "at": 1700000005000,
+        "roomCode": "ABC234",
+        "outcome": "VILLAGE"
+      }
+    },
+    "game_action": {
+      "direction": "c2s",
+      "summary": "Acción del jugador durante la partida.",
+      "fields": {
+        "action": "string",
+        "kind": "string",
+        "targetId": "string",
+        "secondTargetId": "string"
+      },
+      "example": {
+        "v": 1,
+        "type": "game_action",
+        "id": "00000000-0000-0000-0000-000000000022",
+        "at": 1700000001800,
+        "action": "night_action",
+        "kind": "seer",
+        "targetId": "00000000-0000-0000-0000-0000000000cc",
+        "secondTargetId": ""
+      }
     }
   }
 }

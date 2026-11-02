@@ -35,7 +35,11 @@ public final class Protocol {
 			Map.entry("update_settings", UpdateSettings.class),
 			Map.entry("room_settings", RoomSettings.class),
 			Map.entry("start_game", StartGame.class),
-			Map.entry("game_starting", GameStarting.class));
+			Map.entry("game_starting", GameStarting.class),
+			Map.entry("game_state", GameState.class),
+			Map.entry("game_dawn", GameDawn.class),
+			Map.entry("game_over", GameOver.class),
+			Map.entry("game_action", GameAction.class));
 
 	private static final ObjectMapper MAPPER = JsonMapper.builder().build();
 
