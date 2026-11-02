@@ -44,6 +44,8 @@ public final class Game {
 	private final Set<String> readyToVote = new LinkedHashSet<>();
 	private final Map<String, Vote> votes = new LinkedHashMap<>();
 	private final List<String> runoffCandidates = new ArrayList<>();
+	private final Map<String, Vote> presidentVotes = new LinkedHashMap<>();
+	private final List<String> presidentRunoffCandidates = new ArrayList<>();
 
 	private Phase phase;
 	private NightStep nightStep;
@@ -179,6 +181,10 @@ public final class Game {
 
 	/** Elige al Presidente antes del reparto (regla D3). */
 	public void electPresident(String playerId) {
+		electPresident(playerId, clock.instant());
+	}
+
+	private void electPresident(String playerId, Instant now) {
 		if (phase != Phase.PRESIDENT_ELECTION) {
 			throw new IllegalStateException("El Presidente solo se elige al empezar la partida");
 		}
@@ -188,7 +194,102 @@ public final class Game {
 		elected.president(true);
 		this.presidentId = playerId;
 
-		begin(Phase.DEALING, clock.instant());
+		begin(Phase.DEALING, now);
+	}
+
+	/** Voto para elegir al Presidente; {@code targetId} nulo es abstencion (#51). */
+	public void submitPresidentVote(String voterId, String targetId) {
+		if (phase != Phase.PRESIDENT_ELECTION) {
+			throw new GameRuleException(GameRuleException.NOT_YOUR_TURN, "No hay eleccion de Presidente.");
+		}
+
+		GamePlayer voter = requirePlayer(voterId);
+		if (!voter.alive()) {
+			throw new GameRuleException(GameRuleException.NOT_ALIVE, "Los muertos no votan.");
+		}
+
+		if (targetId != null) {
+			GamePlayer target = players.get(targetId);
+			boolean valid = target != null && target.alive() && !targetId.equals(voterId);
+			if (!valid) {
+				throw new GameRuleException(GameRuleException.INVALID_TARGET, "Objetivo de voto invalido.");
+			}
+			if (!presidentRunoffCandidates.isEmpty() && !presidentRunoffCandidates.contains(targetId)) {
+				throw new GameRuleException(GameRuleException.INVALID_TARGET,
+						"En la segunda vuelta solo se puede votar a los empatados.");
+			}
+		}
+
+		presidentVotes.put(voterId, new Vote(voterId, targetId));
+
+		if (allPresidentVotesSubmitted()) {
+			closePresidentElection(clock.instant());
+		}
+	}
+
+	public Optional<Vote> presidentVoteOf(String voterId) {
+		requirePlayer(voterId);
+		return Optional.ofNullable(presidentVotes.get(voterId));
+	}
+
+	public boolean allPresidentVotesSubmitted() {
+		long alive = players.values().stream().filter(GamePlayer::alive).count();
+		return alive > 0 && presidentVotes.size() >= alive;
+	}
+
+	public List<String> presidentRunoffCandidates() {
+		return List.copyOf(presidentRunoffCandidates);
+	}
+
+	/**
+	 * Cierra la eleccion: mayoria simple, segunda vuelta entre empatados y sorteo si el empate
+	 * persiste o si nadie vota.
+	 */
+	public void closePresidentElection(Instant now) {
+		if (phase != Phase.PRESIDENT_ELECTION) {
+			throw new GameRuleException(GameRuleException.NOT_YOUR_TURN, "No hay eleccion de Presidente.");
+		}
+
+		Map<String, Integer> counts = new LinkedHashMap<>();
+		for (Vote vote : presidentVotes.values()) {
+			if (vote.targetId() != null) {
+				counts.merge(vote.targetId(), 1, Integer::sum);
+			}
+		}
+
+		if (counts.isEmpty()) {
+			List<String> candidatos = presidentRunoffCandidates.isEmpty() ? aliveIds()
+					: List.copyOf(presidentRunoffCandidates);
+			electPresident(candidatos.get(random.nextInt(candidatos.size())), now);
+			return;
+		}
+
+		int max = counts.values().stream().mapToInt(Integer::intValue).max().orElse(0);
+		List<String> tied = counts.entrySet().stream()
+				.filter(entry -> entry.getValue() == max)
+				.map(Map.Entry::getKey)
+				.toList();
+
+		if (tied.size() == 1) {
+			electPresident(tied.get(0), now);
+			return;
+		}
+
+		if (presidentRunoffCandidates.isEmpty()) {
+			presidentRunoffCandidates.addAll(tied);
+			presidentVotes.clear();
+			this.deadline = now.plus(RUNOFF_TIME);
+			return;
+		}
+
+		electPresident(tied.get(random.nextInt(tied.size())), now);
+	}
+
+	private List<String> aliveIds() {
+		return players.values().stream()
+				.filter(GamePlayer::alive)
+				.map(GamePlayer::id)
+				.toList();
 	}
 
 	/** Pasa de la votacion a la segunda vuelta (issue #42). */
@@ -204,12 +305,7 @@ public final class Game {
 		Objects.requireNonNull(now, "now");
 
 		switch (phase) {
-			case PRESIDENT_ELECTION -> {
-				if (presidentId == null) {
-					throw new IllegalStateException("Falta elegir al Presidente antes del reparto");
-				}
-				begin(Phase.DEALING, now);
-			}
+			case PRESIDENT_ELECTION -> closePresidentElection(now);
 			case DEALING -> begin(Phase.REVEAL, now);
 			case REVEAL -> {
 				round = 1;
@@ -263,9 +359,6 @@ public final class Game {
 
 		int guard = 0;
 		while (phase != Phase.FINISHED && deadline != null && !deadline.isAfter(now) && guard++ < 20) {
-			if (phase == Phase.PRESIDENT_ELECTION && presidentId == null) {
-				break;
-			}
 			advance(now);
 		}
 		return phase;
@@ -941,7 +1034,11 @@ public final class Game {
 				repartir();
 				this.deadline = now;
 			}
-			case PRESIDENT_ELECTION -> this.deadline = now.plus(PRESIDENT_ELECTION_TIME);
+			case PRESIDENT_ELECTION -> {
+				presidentVotes.clear();
+				presidentRunoffCandidates.clear();
+				this.deadline = now.plus(PRESIDENT_ELECTION_TIME);
+			}
 			case REVEAL -> this.deadline = now.plus(REVEAL_TIME);
 			case NIGHT -> {
 				resetNight();
