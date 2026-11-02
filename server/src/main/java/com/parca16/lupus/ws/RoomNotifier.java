@@ -67,9 +67,14 @@ public class RoomNotifier {
 	}
 
 	/**
-	 * Cierra la sala: avisa a todos menos al excluido, limpia sus sesiones y la saca del registro.
+	 * Cierra la sala: la saca del registro y avisa a todos menos al excluido.
+	 *
+	 * <p>El orden importa: en cuanto un jugador recibe {@code room_closed}, la sala ya no debe
+	 * existir, para que ningun {@code join_room} concurrente pueda colarse en ella.
 	 */
 	public void close(Room room, String reason, String excludedPlayerId) {
+		rooms.remove(room.code());
+
 		for (RoomPlayer player : room.players()) {
 			if (player.id().equals(excludedPlayerId)) {
 				continue;
