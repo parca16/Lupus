@@ -5,10 +5,12 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.random.RandomGenerator;
 
 import com.parca16.lupus.room.GameSettings;
@@ -36,6 +38,9 @@ public final class Game {
 	private final RandomGenerator random;
 	private final Map<String, GamePlayer> players = new LinkedHashMap<>();
 	private final Map<String, NightAction> nightActions = new LinkedHashMap<>();
+	private final Map<String, Integer> livesAtNightStart = new LinkedHashMap<>();
+	private final Map<String, Boolean> aliveAtNightStart = new LinkedHashMap<>();
+	private final Set<String> readyToVote = new LinkedHashSet<>();
 
 	private Phase phase;
 	private NightStep nightStep;
@@ -46,6 +51,7 @@ public final class Game {
 	private String wolfTargetId;
 	private String seerTargetId;
 	private NightResult lastNight;
+	private DawnReport dawnReport;
 	private int guardianProtections;
 	private String lastGuardianTargetId;
 	private int lastGuardianRound = -1;
@@ -153,6 +159,10 @@ public final class Game {
 
 	public NightResult lastNight() {
 		return lastNight;
+	}
+
+	public DawnReport dawnReport() {
+		return dawnReport;
 	}
 
 	public boolean finished() {
@@ -346,9 +356,49 @@ public final class Game {
 		return Optional.ofNullable(wolfTargetId);
 	}
 
+	/**
+	 * Marca al jugador como listo para votar (#41). Cuando todos los vivos lo han hecho, el debate
+	 * termina y se pasa a la votacion.
+	 *
+	 * @return true si el debate ha terminado
+	 */
+	public boolean markReadyToVote(String playerId) {
+		if (phase != Phase.DEBATE) {
+			throw new GameRuleException(GameRuleException.NOT_YOUR_TURN, "Solo se puede marcar listo durante el debate.");
+		}
+
+		GamePlayer player = requirePlayer(playerId);
+		if (!player.alive()) {
+			throw new GameRuleException(GameRuleException.NOT_ALIVE, "Los muertos no pueden marcar listo.");
+		}
+
+		readyToVote.add(playerId);
+
+		if (allReadyToVote()) {
+			begin(Phase.VOTING, clock.instant());
+			return true;
+		}
+		return false;
+	}
+
+	public boolean isReadyToVote(String playerId) {
+		return readyToVote.contains(playerId);
+	}
+
+	public boolean allReadyToVote() {
+		long alive = players.values().stream().filter(GamePlayer::alive).count();
+		if (alive == 0) {
+			return false;
+		}
+		long ready = readyToVote.stream()
+				.map(players::get)
+				.filter(player -> player != null && player.alive())
+				.count();
+		return ready >= alive;
+	}
+
 	/** True si el actor (o todos los lobos) ya han actuado en el paso actual. */
-	public boolean currentStepDone() {
-		if (phase != Phase.NIGHT || nightStep == null) {
+	public boolean currentStepDone() {		if (phase != Phase.NIGHT || nightStep == null) {
 			return false;
 		}
 
@@ -547,8 +597,7 @@ public final class Game {
 		lastNight = new NightResult(wolfTargetId, wolfBlocked, events);
 	}
 
-	private String guardianTarget() {
-		return nightActions.values().stream()
+	private String guardianTarget() {		return nightActions.values().stream()
 				.filter(GuardianAction.class::isInstance)
 				.map(NightAction::targetId)
 				.findFirst()
@@ -600,8 +649,14 @@ public final class Game {
 				this.nightStep = first;
 				this.deadline = now.plus(durationOf(first));
 			}
-			case DAWN -> this.deadline = now.plus(DAWN_TIME);
-			case DEBATE -> this.deadline = now.plusSeconds(settings.debateSeconds());
+			case DAWN -> {
+				this.dawnReport = buildDawnReport();
+				this.deadline = now.plus(DAWN_TIME);
+			}
+			case DEBATE -> {
+				readyToVote.clear();
+				this.deadline = now.plusSeconds(settings.debateSeconds());
+			}
 			case VOTING -> this.deadline = now.plusSeconds(settings.voteSeconds());
 			case RUNOFF -> this.deadline = now.plus(RUNOFF_TIME);
 			case FINISHED -> this.deadline = null;
@@ -623,6 +678,40 @@ public final class Game {
 		wolfTargetId = null;
 		seerTargetId = null;
 		lastNight = null;
+		dawnReport = null;
+
+		livesAtNightStart.clear();
+		aliveAtNightStart.clear();
+		for (GamePlayer player : players.values()) {
+			livesAtNightStart.put(player.id(), player.lives());
+			aliveAtNightStart.put(player.id(), player.alive());
+		}
+	}
+
+	/** Parte del amanecer comparando el estado actual con el inicio de la noche (#40). */
+	private DawnReport buildDawnReport() {
+		List<DawnEvent> events = new ArrayList<>();
+
+		for (GamePlayer player : players.values()) {
+			Boolean wasAlive = aliveAtNightStart.get(player.id());
+			Integer livesBefore = livesAtNightStart.get(player.id());
+
+			if (wasAlive == null || livesBefore == null || !wasAlive) {
+				continue;
+			}
+
+			if (!player.alive()) {
+				events.add(new DawnEvent(DawnEvent.Type.DIED, player.id(), player.nickname(), 0));
+			}
+			else if (player.lives() < livesBefore) {
+				events.add(new DawnEvent(DawnEvent.Type.LOST_LIFE, player.id(), player.nickname(), player.lives()));
+			}
+			else if (player.lives() > livesBefore) {
+				events.add(new DawnEvent(DawnEvent.Type.HEALED, player.id(), player.nickname(), player.lives()));
+			}
+		}
+
+		return new DawnReport(events);
 	}
 
 	private NightStep firstStep() {
