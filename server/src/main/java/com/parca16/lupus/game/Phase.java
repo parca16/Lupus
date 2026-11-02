@@ -7,6 +7,7 @@ public enum Phase {
 	REVEAL,
 	NIGHT,
 	DAWN,
+	KNIGHT_REACTION,
 	DEBATE,
 	VOTING,
 	RUNOFF,
