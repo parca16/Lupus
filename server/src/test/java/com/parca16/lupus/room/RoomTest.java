@@ -5,6 +5,12 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+
 import org.junit.jupiter.api.Test;
 
 class RoomTest {
@@ -113,7 +119,7 @@ class RoomTest {
 		RoomPlayer invitado = room.addPlayer("Luis");
 		room.disconnect(invitado.id());
 
-		RoomPlayer recuperado = room.reconnect("luis").orElseThrow();
+		RoomPlayer recuperado = room.reconnect(invitado.id());
 
 		assertEquals(invitado.id(), recuperado.id());
 		assertTrue(recuperado.connected());
@@ -121,11 +127,20 @@ class RoomTest {
 	}
 
 	@Test
-	void reconectarNoRecuperaUnAsientoQueSigueConectado() {
+	void reconectarUnAsientoYaConectadoFalla() {
 		Room room = nuevaSala();
-		room.addPlayer("Luis");
+		RoomPlayer invitado = room.addPlayer("Luis");
 
-		assertTrue(room.reconnect("Luis").isEmpty());
+		RoomException exception = assertThrows(RoomException.class, () -> room.reconnect(invitado.id()));
+
+		assertEquals(RoomException.ALREADY_CONNECTED, exception.code());
+	}
+
+	@Test
+	void reconectarUnAsientoQueNoExisteFalla() {
+		RoomException exception = assertThrows(RoomException.class, () -> nuevaSala().reconnect("fantasma"));
+
+		assertEquals(RoomException.SEAT_NOT_FOUND, exception.code());
 	}
 
 	@Test
@@ -139,5 +154,61 @@ class RoomTest {
 				assertThrows(RoomException.class, () -> room.addPlayer("a".repeat(17))).code());
 		assertEquals(RoomException.INVALID_NICKNAME,
 				assertThrows(RoomException.class, () -> room.addPlayer(null)).code());
+	}
+
+	@Test
+	void laSalaCaducaTrasElTiempoSinActividad() {
+		RelojMovil reloj = new RelojMovil(Instant.parse("2026-01-01T00:00:00Z"));
+		Room room = new Room(CODE, RoomCapacity.DEFAULT, reloj);
+
+		reloj.avanzar(Duration.ofMinutes(29));
+		assertFalse(room.expired(reloj.instant(), Duration.ofMinutes(30)));
+
+		reloj.avanzar(Duration.ofMinutes(2));
+		assertTrue(room.expired(reloj.instant(), Duration.ofMinutes(30)));
+	}
+
+	@Test
+	void laActividadReiniciaElContadorDeCaducidad() {
+		RelojMovil reloj = new RelojMovil(Instant.parse("2026-01-01T00:00:00Z"));
+		Room room = new Room(CODE, RoomCapacity.DEFAULT, reloj);
+
+		reloj.avanzar(Duration.ofMinutes(20));
+		room.touch();
+		reloj.avanzar(Duration.ofMinutes(20));
+
+		assertFalse(room.expired(reloj.instant(), Duration.ofMinutes(30)));
+
+		reloj.avanzar(Duration.ofMinutes(11));
+		assertTrue(room.expired(reloj.instant(), Duration.ofMinutes(30)));
+	}
+
+	/** Reloj manipulable para probar la caducidad sin esperar. */
+	static final class RelojMovil extends Clock {
+
+		private Instant now;
+
+		RelojMovil(Instant now) {
+			this.now = now;
+		}
+
+		void avanzar(Duration duration) {
+			this.now = now.plus(duration);
+		}
+
+		@Override
+		public ZoneId getZone() {
+			return ZoneOffset.UTC;
+		}
+
+		@Override
+		public Clock withZone(ZoneId zone) {
+			return this;
+		}
+
+		@Override
+		public Instant instant() {
+			return now;
+		}
 	}
 }

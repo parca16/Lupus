@@ -42,6 +42,7 @@ Ejemplo:
 | `error` | servidor → cliente | `code`, `message` | El servidor rechaza un mensaje y explica por qué. |
 | `create_room` | cliente → servidor | `nickname` | Crea una sala privada; el creador es host. |
 | `join_room` | cliente → servidor | `roomCode`, `nickname` | Entra en una sala por su código. |
+| `resume_room` | cliente → servidor | `roomCode`, `playerId` | Recupera un asiento con la identidad guardada. |
 | `room_state` | servidor → cliente | `roomCode`, `playerId`, `players` | Respuesta a `create_room`/`join_room`. |
 | `room_updated` | servidor → cliente | `roomCode`, `players` | La lista de jugadores ha cambiado. |
 | `leave_room` | cliente → servidor | — | Salida voluntaria. Si sale el host en el lobby, la sala se cierra. |
@@ -181,6 +182,8 @@ Códigos de error previstos:
 | `not_enough_players` | Hacen falta al menos 5 jugadores conectados para empezar. |
 | `invalid_settings_for_players` | Con ese número de jugadores no caben las cartas elegidas. |
 | `game_already_started` | La partida ya ha empezado y no admite jugadores nuevos. |
+| `seat_not_found` | Ese asiento ya no existe en la sala. |
+| `already_connected` | Ese jugador ya está conectado (por ejemplo, en otra pestaña). |
 
 ## Reglas
 
@@ -209,10 +212,13 @@ base para reconectar en la issue #26 y para la cola de mensajes de la issue #33.
   `room_updated`. Si alguien que no es host lo intenta, recibe `error` con `not_host`.
 - **Desconexión**: no es lo mismo que salir. El jugador se queda con `connected: false` y la sala
   sigue abierta (también si era el host), para que pueda volver.
-- **Reconexión**: al volver, el cliente reenvía `join_room` con el mismo apodo y el servidor le
-  devuelve **su mismo asiento** (`playerId`), marcándolo de nuevo como conectado. Los mensajes
+- **Reconexión**: al volver, el cliente reenvía `resume_room` con su `roomCode` y su `playerId`, y
+  el servidor le devuelve **su mismo asiento**, marcándolo de nuevo como conectado. Los mensajes
   enviados mientras estaba caído se guardan en cola y se mandan al reconectar.
-- La identidad persistente entre recargas del navegador llega con la issue #26.
+- **Identidad persistente**: el navegador guarda `{ roomCode, playerId, nickname }` en
+  `localStorage`. Al recargar la página, el cliente reconecta y recupera el asiento solo. Si el
+  asiento ya no existe (sala caducada) o ya está conectado en otra pestaña, se borra la sesión y
+  se avisa con `seat_not_found`, `room_not_found` o `already_connected`.
 
 ## Configuración y arranque
 
@@ -241,6 +247,16 @@ Reglas de validación (issue #27):
 Al empezar (`start_game`), el servidor valida la configuración con el número real de jugadores y
 emite `game_starting` a todos. Solo el host puede cambiar la configuración o empezar la partida
 (`not_host` en caso contrario).
+
+## Caducidad de salas
+
+- Una sala **sin actividad durante 30 minutos** se destruye (issue #25).
+- Cuenta como actividad **cualquier mensaje de un jugador de la sala**, incluido `ping`; también
+  crear, unirse, cambiar configuración o empezar.
+- La limpieza corre cada minuto y, al caducar, avisa a los conectados con `room_closed` y
+  `reason: "inactivity"`.
+- Se puede ajustar en el servidor con `lupus.rooms.expiration-millis` (por defecto `1800000`) y
+  `lupus.rooms.sweep-millis` (por defecto `60000`).
 
 ## Cómo se mantiene sincronizado
 

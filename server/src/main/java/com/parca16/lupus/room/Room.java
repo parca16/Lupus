@@ -1,10 +1,12 @@
 package com.parca16.lupus.room;
 
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -17,13 +19,21 @@ public final class Room {
 
 	private final String code;
 	private final RoomCapacity capacity;
+	private final Clock clock;
 	private final Map<String, RoomPlayer> players = new LinkedHashMap<>();
 	private GameState state = GameState.WAITING;
 	private GameSettings gameSettings = GameSettings.DEFAULT;
+	private Instant lastActivityAt;
 
 	Room(String code, RoomCapacity capacity) {
+		this(code, capacity, Clock.systemUTC());
+	}
+
+	Room(String code, RoomCapacity capacity, Clock clock) {
 		this.code = Objects.requireNonNull(code, "code");
 		this.capacity = Objects.requireNonNull(capacity, "capacity");
+		this.clock = Objects.requireNonNull(clock, "clock");
+		this.lastActivityAt = clock.instant();
 	}
 
 	public String code() {
@@ -40,6 +50,7 @@ public final class Room {
 
 	public synchronized void gameSettings(GameSettings settings) {
 		this.gameSettings = Objects.requireNonNull(settings, "settings").validated();
+		touch();
 	}
 
 	public synchronized GameState state() {
@@ -48,6 +59,21 @@ public final class Room {
 
 	public synchronized void state(GameState state) {
 		this.state = Objects.requireNonNull(state, "state");
+		touch();
+	}
+
+	/** Marca la sala como activa; cualquier mensaje de sus jugadores la mantiene viva. */
+	public synchronized void touch() {
+		this.lastActivityAt = clock.instant();
+	}
+
+	public synchronized Instant lastActivityAt() {
+		return lastActivityAt;
+	}
+
+	/** Una sala caduca cuando pasan {@code ttl} sin ninguna actividad. */
+	public synchronized boolean expired(Instant now, Duration ttl) {
+		return !lastActivityAt.plus(ttl).isAfter(now);
 	}
 
 	/** Anade un jugador; el primero de la sala es el host. */
@@ -67,6 +93,7 @@ public final class Room {
 
 		RoomPlayer player = new RoomPlayer(UUID.randomUUID().toString(), clean, players.isEmpty(), true);
 		players.put(player.id(), player);
+		touch();
 		return player;
 	}
 
@@ -88,26 +115,30 @@ public final class Room {
 		if (removed == null) {
 			throw new RoomException(RoomException.NOT_IN_ROOM, "El jugador no pertenece a esta sala.");
 		}
+		touch();
 		return removed;
 	}
 
 	/**
-	 * Recupera el asiento de un jugador desconectado con ese apodo.
+	 * Recupera el asiento de un jugador desconectado a partir de su identidad persistente.
 	 *
-	 * <p>Es la base de la reconexion: mientras el jugador no se haya ido voluntariamente, su
-	 * asiento le espera. La identidad persistente llega con la issue #26.
+	 * <p>El {@code playerId} es el que el navegador guarda en {@code localStorage}; si ese asiento
+	 * ya esta conectado (por ejemplo, otra pestaña), se rechaza.
 	 */
-	public synchronized Optional<RoomPlayer> reconnect(String nickname) {
-		String clean = Nicknames.require(nickname);
+	public synchronized RoomPlayer reconnect(String playerId) {
+		RoomPlayer player = players.get(playerId);
 
-		return players.values().stream()
-				.filter(player -> !player.connected() && player.nickname().equalsIgnoreCase(clean))
-				.findFirst()
-				.map(player -> {
-					RoomPlayer reconnected = new RoomPlayer(player.id(), player.nickname(), player.host(), true);
-					players.put(player.id(), reconnected);
-					return reconnected;
-				});
+		if (player == null) {
+			throw new RoomException(RoomException.SEAT_NOT_FOUND, "Ese asiento ya no existe en la sala.");
+		}
+		if (player.connected()) {
+			throw new RoomException(RoomException.ALREADY_CONNECTED, "Ese jugador ya esta conectado.");
+		}
+
+		RoomPlayer reconnected = new RoomPlayer(player.id(), player.nickname(), player.host(), true);
+		players.put(playerId, reconnected);
+		touch();
+		return reconnected;
 	}
 
 	public synchronized boolean isHost(String playerId) {

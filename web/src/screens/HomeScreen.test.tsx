@@ -14,6 +14,7 @@ function renderHome(overrides: Partial<SessionValue> = {}) {
     players: [],
     settings: null,
     starting: false,
+    restoring: false,
     error: null,
     notice: null,
     createRoom: vi.fn(),
@@ -84,5 +85,17 @@ describe('HomeScreen', () => {
     renderHome({ status: 'connecting' })
 
     expect(screen.getByRole('button', { name: 'Conectando…' })).toBeDisabled()
+  })
+
+  it('muestra que está recuperando la sala', () => {
+    renderHome({ restoring: true })
+
+    expect(screen.getByText('Recuperando tu sala…')).toBeInTheDocument()
+  })
+
+  it('muestra los avisos de sesión', () => {
+    renderHome({ notice: 'Tu sala ya no está disponible.' })
+
+    expect(screen.getByRole('status')).toHaveTextContent(/ya no está disponible/i)
   })
 })

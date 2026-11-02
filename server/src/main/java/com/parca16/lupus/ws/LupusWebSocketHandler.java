@@ -1,8 +1,10 @@
 package com.parca16.lupus.ws;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.util.List;
+import static com.parca16.lupus.ws.SessionAttributes.CONNECTION_ID;
+import static com.parca16.lupus.ws.SessionAttributes.NICKNAME;
+import static com.parca16.lupus.ws.SessionAttributes.PLAYER_ID;
+import static com.parca16.lupus.ws.SessionAttributes.ROOM_CODE;
+
 import java.util.UUID;
 
 import org.springframework.stereotype.Component;
@@ -22,13 +24,11 @@ import com.parca16.lupus.protocol.Kicked;
 import com.parca16.lupus.protocol.LeaveRoom;
 import com.parca16.lupus.protocol.Message;
 import com.parca16.lupus.protocol.Ping;
-import com.parca16.lupus.protocol.Player;
 import com.parca16.lupus.protocol.Pong;
 import com.parca16.lupus.protocol.Protocol;
-import com.parca16.lupus.protocol.RoomClosed;
+import com.parca16.lupus.protocol.ResumeRoom;
 import com.parca16.lupus.protocol.RoomSettings;
 import com.parca16.lupus.protocol.RoomState;
-import com.parca16.lupus.protocol.RoomUpdated;
 import com.parca16.lupus.protocol.StartGame;
 import com.parca16.lupus.protocol.UpdateSettings;
 import com.parca16.lupus.protocol.Welcome;
@@ -48,18 +48,14 @@ import com.parca16.lupus.room.RoomRegistry;
 @Component
 public class LupusWebSocketHandler extends TextWebSocketHandler {
 
-	static final String CONNECTION_ID = "connectionId";
-	static final String NICKNAME = "nickname";
-	static final String PLAYER_ID = "playerId";
-	static final String ROOM_CODE = "roomCode";
-	static final String HOST_LEFT = "host_left";
-
 	private final RoomRegistry rooms;
 	private final PlayerSessions sessions;
+	private final RoomNotifier notifier;
 
-	public LupusWebSocketHandler(RoomRegistry rooms, PlayerSessions sessions) {
+	public LupusWebSocketHandler(RoomRegistry rooms, PlayerSessions sessions, RoomNotifier notifier) {
 		this.rooms = rooms;
 		this.sessions = sessions;
+		this.notifier = notifier;
 	}
 
 	@Override
@@ -82,10 +78,10 @@ public class LupusWebSocketHandler extends TextWebSocketHandler {
 		rooms.find(roomCode).ifPresent(room -> {
 			if (room.contains(playerId)) {
 				room.disconnect(playerId);
-				broadcast(room, playerId);
+				notifier.broadcastPlayers(room, playerId);
 			}
 		});
-		limpiarSesion(session);
+		SessionAttributes.clearMembership(session);
 	}
 
 	@Override
@@ -120,11 +116,21 @@ public class LupusWebSocketHandler extends TextWebSocketHandler {
 			return;
 		}
 
+		marcarActividad(session);
+
 		try {
 			dispatch(session, decoded);
 		}
 		catch (RoomException exception) {
 			sendError(session, exception.code(), exception.getMessage());
+		}
+	}
+
+	/** Cualquier mensaje de un jugador de la sala cuenta como actividad (issue #25). */
+	private void marcarActividad(WebSocketSession session) {
+		String roomCode = (String) session.getAttributes().get(ROOM_CODE);
+		if (roomCode != null) {
+			rooms.find(roomCode).ifPresent(Room::touch);
 		}
 	}
 
@@ -134,10 +140,13 @@ public class LupusWebSocketHandler extends TextWebSocketHandler {
 				session.getAttributes().put(NICKNAME, hello.nickname());
 				sendWelcome(session);
 			}
-			case Echo echo -> send(session, new Echo(Protocol.VERSION, echo.id(), echo.at(), echo.text()));
-			case Ping ping -> send(session, new Pong(Protocol.VERSION, ping.id(), System.currentTimeMillis()));
+			case Echo echo -> notifier.send(session,
+					new Echo(Protocol.VERSION, echo.id(), echo.at(), echo.text()));
+			case Ping ping -> notifier.send(session,
+					new Pong(Protocol.VERSION, ping.id(), System.currentTimeMillis()));
 			case CreateRoom createRoom -> crearSala(session, createRoom);
 			case JoinRoom joinRoom -> unirseASala(session, joinRoom);
+			case ResumeRoom resumeRoom -> reanudarSala(session, resumeRoom);
 			case LeaveRoom ignored -> salirDeSala(session);
 			case KickPlayer kickPlayer -> expulsar(session, kickPlayer);
 			case UpdateSettings updateSettings -> actualizarConfiguracion(session, updateSettings);
@@ -159,19 +168,30 @@ public class LupusWebSocketHandler extends TextWebSocketHandler {
 		Room room = rooms.find(message.roomCode()).orElseThrow(() -> new RoomException(
 				RoomException.ROOM_NOT_FOUND, "No existe ninguna sala con el codigo " + message.roomCode()));
 
-		RoomPlayer player = room.reconnect(message.nickname()).orElse(null);
-		if (player == null) {
-			if (room.state() != GameState.WAITING) {
-				throw new RoomException(RoomException.GAME_ALREADY_STARTED,
-						"La partida ya ha empezado; no se puede entrar.");
-			}
-			player = room.addPlayer(message.nickname());
+		if (room.state() != GameState.WAITING) {
+			throw new RoomException(RoomException.GAME_ALREADY_STARTED,
+					"La partida ya ha empezado; no se puede entrar.");
 		}
+
+		RoomPlayer player = room.addPlayer(message.nickname());
 
 		vincular(session, room, player);
 		sendRoomState(session, room, player);
 		sendRoomSettings(session, room);
-		broadcast(room, player.id());
+		notifier.broadcastPlayers(room, player.id());
+	}
+
+	/** Vuelve a ocupar un asiento con la identidad persistente del navegador. */
+	private void reanudarSala(WebSocketSession session, ResumeRoom message) {
+		Room room = rooms.find(message.roomCode()).orElseThrow(() -> new RoomException(
+				RoomException.ROOM_NOT_FOUND, "La sala ya no existe."));
+
+		RoomPlayer player = room.reconnect(message.playerId());
+
+		vincular(session, room, player);
+		sendRoomState(session, room, player);
+		sendRoomSettings(session, room);
+		notifier.broadcastPlayers(room, player.id());
 	}
 
 	private void actualizarConfiguracion(WebSocketSession session, UpdateSettings message) {
@@ -186,7 +206,7 @@ public class LupusWebSocketHandler extends TextWebSocketHandler {
 				message.showVoteDetail());
 
 		room.gameSettings(settings);
-		broadcastToAll(room, roomSettingsMessage(room));
+		notifier.broadcastAll(room, roomSettingsMessage(room));
 	}
 
 	private void empezarPartida(WebSocketSession session) {
@@ -200,7 +220,7 @@ public class LupusWebSocketHandler extends TextWebSocketHandler {
 		room.gameSettings().validatedForStart(conectados);
 		room.state(GameState.STARTING);
 
-		broadcastToAll(room, new GameStarting(Protocol.VERSION, UUID.randomUUID().toString(),
+		notifier.broadcastAll(room, new GameStarting(Protocol.VERSION, UUID.randomUUID().toString(),
 				System.currentTimeMillis(), room.code()));
 	}
 
@@ -209,14 +229,16 @@ public class LupusWebSocketHandler extends TextWebSocketHandler {
 		String playerId = jugadorActual(session);
 
 		if (room.isHost(playerId)) {
-			cerrarSala(room, session, playerId);
+			notifier.close(room, RoomNotifier.HOST_LEFT, playerId);
+			SessionAttributes.clearMembership(session);
+			sessions.unbind(playerId);
 			return;
 		}
 
 		room.remove(playerId);
-		limpiarSesion(session);
+		SessionAttributes.clearMembership(session);
 		sessions.unbind(playerId);
-		broadcast(room, playerId);
+		notifier.broadcastPlayers(room, playerId);
 	}
 
 	private void expulsar(WebSocketSession session, KickPlayer message) {
@@ -232,31 +254,12 @@ public class LupusWebSocketHandler extends TextWebSocketHandler {
 
 		RoomPlayer expulsado = room.remove(message.playerId());
 		sessions.find(expulsado.id()).ifPresent(target -> {
-			send(target, new Kicked(Protocol.VERSION, UUID.randomUUID().toString(), System.currentTimeMillis(),
-					room.code()));
-			limpiarSesion(target);
+			notifier.send(target, new Kicked(Protocol.VERSION, UUID.randomUUID().toString(),
+					System.currentTimeMillis(), room.code()));
+			SessionAttributes.clearMembership(target);
 			sessions.unbind(expulsado.id());
 		});
-		broadcast(room, expulsado.id());
-	}
-
-	/** El host abandona el lobby: se cierra la sala y se avisa al resto. */
-	private void cerrarSala(Room room, WebSocketSession hostSession, String hostId) {
-		for (RoomPlayer player : room.players()) {
-			if (player.id().equals(hostId)) {
-				continue;
-			}
-			sessions.find(player.id()).ifPresent(target -> {
-				send(target, new RoomClosed(Protocol.VERSION, UUID.randomUUID().toString(),
-						System.currentTimeMillis(), room.code(), HOST_LEFT));
-				limpiarSesion(target);
-				sessions.unbind(player.id());
-			});
-		}
-
-		rooms.remove(room.code());
-		limpiarSesion(hostSession);
-		sessions.unbind(hostId);
+		notifier.broadcastPlayers(room, expulsado.id());
 	}
 
 	private Room salaActual(WebSocketSession session) {
@@ -280,18 +283,13 @@ public class LupusWebSocketHandler extends TextWebSocketHandler {
 		sessions.bind(player.id(), session);
 	}
 
-	private static void limpiarSesion(WebSocketSession session) {
-		session.getAttributes().remove(PLAYER_ID);
-		session.getAttributes().remove(ROOM_CODE);
-	}
-
 	private void sendRoomState(WebSocketSession session, Room room, RoomPlayer player) {
-		send(session, new RoomState(Protocol.VERSION, UUID.randomUUID().toString(), System.currentTimeMillis(),
-				room.code(), player.id(), wire(room.players())));
+		notifier.send(session, new RoomState(Protocol.VERSION, UUID.randomUUID().toString(),
+				System.currentTimeMillis(), room.code(), player.id(), RoomNotifier.wire(room.players())));
 	}
 
 	private void sendRoomSettings(WebSocketSession session, Room room) {
-		send(session, roomSettingsMessage(room));
+		notifier.send(session, roomSettingsMessage(room));
 	}
 
 	private static RoomSettings roomSettingsMessage(Room room) {
@@ -302,52 +300,15 @@ public class LupusWebSocketHandler extends TextWebSocketHandler {
 				settings.showVoteDetail());
 	}
 
-	private void broadcastToAll(Room room, Message message) {
-		for (RoomPlayer player : room.players()) {
-			sessions.find(player.id()).ifPresent(target -> send(target, message));
-		}
-	}
-
-	private void broadcast(Room room, String excludedPlayerId) {
-		List<Player> players = wire(room.players());
-
-		for (RoomPlayer player : room.players()) {
-			if (player.id().equals(excludedPlayerId)) {
-				continue;
-			}
-			sessions.find(player.id()).ifPresent(target -> send(target, new RoomUpdated(Protocol.VERSION,
-					UUID.randomUUID().toString(), System.currentTimeMillis(), room.code(), players)));
-		}
-	}
-
-	private static List<Player> wire(List<RoomPlayer> players) {
-		return players.stream()
-				.map(player -> new Player(player.id(), player.nickname(), player.host(), player.connected()))
-				.toList();
-	}
-
 	private void sendWelcome(WebSocketSession session) {
 		long now = System.currentTimeMillis();
-		send(session, new Welcome(Protocol.VERSION, UUID.randomUUID().toString(), now,
+		notifier.send(session, new Welcome(Protocol.VERSION, UUID.randomUUID().toString(), now,
 				(String) session.getAttributes().get(CONNECTION_ID),
 				(String) session.getAttributes().get(NICKNAME), now));
 	}
 
 	private void sendError(WebSocketSession session, String code, String message) {
-		send(session, new ErrorMessage(Protocol.VERSION,
-				UUID.randomUUID().toString(), System.currentTimeMillis(), code, message));
-	}
-
-	private void send(WebSocketSession session, Message message) {
-		try {
-			synchronized (session) {
-				if (session.isOpen()) {
-					session.sendMessage(new TextMessage(Protocol.encode(message)));
-				}
-			}
-		}
-		catch (IOException exception) {
-			throw new UncheckedIOException("No se pudo enviar el mensaje", exception);
-		}
+		notifier.send(session, new ErrorMessage(Protocol.VERSION, UUID.randomUUID().toString(),
+				System.currentTimeMillis(), code, message));
 	}
 }
