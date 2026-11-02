@@ -16,7 +16,7 @@ public record GameSettings(int wolves, List<String> roles, int lives, boolean pr
 	public static final int MIN_PLAYERS = 5;
 	public static final int MAX_WOLVES = 8;
 
-	public static final GameSettings DEFAULT = new GameSettings(1, List.of(), 1, false, 120, 30, 45, true);
+	public static final GameSettings DEFAULT = new GameSettings(1, List.of(), 1, false, 240, 20, 45, true);
 
 	public GameSettings {
 		roles = List.copyOf(roles);
