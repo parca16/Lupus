@@ -254,8 +254,8 @@
         "roles": ["seer", "witch"],
         "lives": 1,
         "president": false,
-        "debateSeconds": 120,
-        "roleSeconds": 30,
+        "debateSeconds": 240,
+        "roleSeconds": 20,
         "voteSeconds": 45,
         "showVoteDetail": true
       }
@@ -284,8 +284,8 @@
         "roles": ["seer", "witch"],
         "lives": 1,
         "president": false,
-        "debateSeconds": 120,
-        "roleSeconds": 30,
+        "debateSeconds": 240,
+        "roleSeconds": 20,
         "voteSeconds": 45,
         "showVoteDetail": true
       }

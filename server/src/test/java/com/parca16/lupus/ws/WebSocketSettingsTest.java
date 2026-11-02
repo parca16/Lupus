@@ -39,8 +39,8 @@ class WebSocketSettingsTest {
 			assertEquals(0, ajustes.get("roles").size());
 			assertEquals(1, ajustes.get("lives").asInt());
 			assertFalse(ajustes.get("president").asBoolean());
-			assertEquals(120, ajustes.get("debateSeconds").asInt());
-			assertEquals(30, ajustes.get("roleSeconds").asInt());
+			assertEquals(240, ajustes.get("debateSeconds").asInt());
+			assertEquals(20, ajustes.get("roleSeconds").asInt());
 			assertEquals(45, ajustes.get("voteSeconds").asInt());
 			assertTrue(ajustes.get("showVoteDetail").asBoolean());
 		}
