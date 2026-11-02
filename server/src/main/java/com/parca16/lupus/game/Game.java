@@ -28,6 +28,7 @@ public final class Game {
 	public static final Duration DAWN_TIME = Duration.ofSeconds(10);
 	public static final Duration RUNOFF_TIME = Duration.ofSeconds(30);
 	public static final Duration MIN_WOLF_WINDOW = Duration.ofSeconds(40);
+	public static final Duration KNIGHT_REACTION_TIME = Duration.ofSeconds(20);
 
 	private static final List<NightStep> NIGHT_ORDER = List.of(NightStep.CUPID, NightStep.SEER,
 			NightStep.GUARDIAN, NightStep.WOLVES, NightStep.WITCH);
@@ -52,6 +53,9 @@ public final class Game {
 	private Outcome outcome;
 	private VoteResult lastVoteResult;
 	private LynchResult lastLynch;
+	private String pendingKnightId;
+	private Phase knightReturnPhase;
+	private KnightStrike lastKnightStrike;
 	private String wolfTargetId;
 	private String seerTargetId;
 	private NightResult lastNight;
@@ -229,7 +233,21 @@ public final class Game {
 					deadline = now.plus(durationOf(next));
 				}
 			}
-			case DAWN -> begin(Phase.DEBATE, now);
+			case DAWN -> {
+				if (pendingKnightId != null) {
+					knightReturnPhase = Phase.DEBATE;
+					begin(Phase.KNIGHT_REACTION, now);
+				}
+				else {
+					begin(Phase.DEBATE, now);
+				}
+			}
+			case KNIGHT_REACTION -> {
+				pendingKnightId = null;
+				Phase next = knightReturnPhase == null ? Phase.DEBATE : knightReturnPhase;
+				knightReturnPhase = null;
+				begin(next, now);
+			}
 			case DEBATE -> begin(Phase.VOTING, now);
 			case VOTING, RUNOFF -> closeVoting(now);
 			case FINISHED -> throw new IllegalStateException("La partida ya ha terminado");
@@ -279,6 +297,7 @@ public final class Game {
 		}
 
 		player.alive(false);
+		onDefinitiveDeath(player);
 		return HitResult.DIED;
 	}
 
@@ -304,6 +323,7 @@ public final class Game {
 
 		player.lives(0);
 		player.alive(false);
+		onDefinitiveDeath(player);
 		return true;
 	}
 
@@ -313,6 +333,46 @@ public final class Game {
 
 	public int livesOf(String playerId) {
 		return requirePlayer(playerId).lives();
+	}
+
+	/** Enamorado de un jugador; solo debe enviarse al propio jugador. */
+	public Optional<String> loverOf(String playerId) {
+		return Optional.ofNullable(requirePlayer(playerId).loverId());
+	}
+
+	/** Caballero que esta eligiendo a quien golpear, si hay alguno. */
+	public String pendingKnightId() {
+		return pendingKnightId;
+	}
+
+	public KnightStrike lastKnightStrike() {
+		return lastKnightStrike;
+	}
+
+	/** El Caballero muerto elige objetivo; su golpe se resuelve al instante. */
+	public void chooseKnightTarget(String playerId, String targetId) {
+		if (phase != Phase.KNIGHT_REACTION) {
+			throw new GameRuleException(GameRuleException.NOT_YOUR_TURN, "El Caballero no esta eligiendo ahora.");
+		}
+		if (pendingKnightId == null || !pendingKnightId.equals(playerId)) {
+			throw new GameRuleException(GameRuleException.NOT_YOUR_TURN, "No eres el Caballero.");
+		}
+
+		GamePlayer target = requirePlayer(targetId);
+		if (!target.alive() || targetId.equals(playerId)) {
+			throw new GameRuleException(GameRuleException.INVALID_TARGET, "Objetivo invalido.");
+		}
+
+		HitResult result = hit(targetId);
+		lastKnightStrike = new KnightStrike(playerId, targetId, result);
+		pendingKnightId = null;
+		checkVictory();
+
+		if (!finished()) {
+			Phase next = knightReturnPhase == null ? Phase.DEBATE : knightReturnPhase;
+			knightReturnPhase = null;
+			begin(next, clock.instant());
+		}
 	}
 
 	/** Envia una accion de noche; valida fase, rol, ventana y objetivo. */
@@ -333,6 +393,7 @@ public final class Game {
 			case GuardianAction guardian -> actuarGuardian(player, guardian);
 			case WitchAction witch -> actuarBruja(player, witch);
 			case WolfVote vote -> votarLobo(player, vote);
+			case CupidAction cupid -> actuarCupido(player, cupid);
 		}
 	}
 
@@ -412,6 +473,11 @@ public final class Game {
 			throw new GameRuleException(GameRuleException.NOT_ALIVE, "Los muertos no votan.");
 		}
 
+		if (targetId != null && targetId.equals(voter.loverId())) {
+			throw new GameRuleException(GameRuleException.INVALID_TARGET,
+					"No puedes votar a tu enamorado.");
+		}
+
 		if (targetId != null) {
 			GamePlayer target = players.get(targetId);
 			boolean validTarget = target != null && target.alive() && !targetId.equals(voterId);
@@ -468,8 +534,15 @@ public final class Game {
 		checkVictory();
 
 		if (!finished()) {
-			round++;
-			begin(Phase.NIGHT, now);
+			if (pendingKnightId != null) {
+				round++;
+				knightReturnPhase = Phase.NIGHT;
+				begin(Phase.KNIGHT_REACTION, now);
+			}
+			else {
+				round++;
+				begin(Phase.NIGHT, now);
+			}
 		}
 
 		return result;
@@ -497,6 +570,20 @@ public final class Game {
 		}
 
 		List<GamePlayer> vivos = players.values().stream().filter(GamePlayer::alive).toList();
+
+		if (vivos.size() == 2) {
+			GamePlayer primero = vivos.get(0);
+			GamePlayer segundo = vivos.get(1);
+			boolean enamorados = primero.loverId() != null && primero.loverId().equals(segundo.id())
+					&& segundo.loverId() != null && segundo.loverId().equals(primero.id());
+			boolean distintasFacciones = primero.role().isWolf() != segundo.role().isWolf();
+
+			if (enamorados && distintasFacciones) {
+				finish(Outcome.LOVERS);
+				return Outcome.LOVERS;
+			}
+		}
+
 		long lobos = vivos.stream().filter(player -> player.role() == Role.WOLF).count();
 		long noLobos = vivos.size() - lobos;
 
@@ -581,7 +668,7 @@ public final class Game {
 			case GUARDIAN -> hasAction(GuardianAction.class);
 			case WITCH -> hasAction(WitchAction.class);
 			case WOLVES -> allWolvesVoted();
-			case CUPID -> false;
+			case CUPID -> hasAction(CupidAction.class);
 		};
 	}
 
@@ -664,6 +751,26 @@ public final class Game {
 		requiereObjetivoVivo(vote.targetId());
 
 		nightActions.put(player.id(), vote);
+	}
+
+	private void actuarCupido(GamePlayer player, CupidAction action) {
+		requierePaso(NightStep.CUPID);
+		requiereRol(player, Role.CUPID);
+		requiereSinActuar(player);
+
+		String primero = action.firstLoverId();
+		String segundo = action.secondLoverId();
+
+		if (primero == null || segundo == null || primero.equals(segundo)) {
+			throw new GameRuleException(GameRuleException.INVALID_TARGET,
+					"Debes elegir a dos enamorados distintos.");
+		}
+		requiereObjetivoVivo(primero);
+		requiereObjetivoVivo(segundo);
+
+		players.get(primero).loverId(segundo);
+		players.get(segundo).loverId(primero);
+		nightActions.put(player.id(), action);
 	}
 
 	private void requierePaso(NightStep expected) {
@@ -794,6 +901,29 @@ public final class Game {
 				.orElse(null);
 	}
 
+	/**
+	 * Consecuencias de una muerte definitiva: el Caballero queda pendiente de golpear y los
+	 * enamorados mueren juntos (issue #49 y #50).
+	 */
+	private void onDefinitiveDeath(GamePlayer player) {
+		if (player.role() == Role.KNIGHT && !player.knightReacted()) {
+			player.knightReacted(true);
+			pendingKnightId = player.id();
+		}
+
+		String loverId = player.loverId();
+		if (loverId == null) {
+			return;
+		}
+
+		GamePlayer lover = players.get(loverId);
+		if (lover != null && lover.alive()) {
+			lover.lives(0);
+			lover.alive(false);
+			onDefinitiveDeath(lover);
+		}
+	}
+
 	private GamePlayer requirePlayer(String playerId) {
 		GamePlayer player = players.get(playerId);
 		if (player == null) {
@@ -827,6 +957,7 @@ public final class Game {
 				this.dawnReport = buildDawnReport();
 				this.deadline = now.plus(DAWN_TIME);
 			}
+			case KNIGHT_REACTION -> this.deadline = now.plus(KNIGHT_REACTION_TIME);
 			case DEBATE -> {
 				readyToVote.clear();
 				this.deadline = now.plusSeconds(settings.debateSeconds());
@@ -861,6 +992,7 @@ public final class Game {
 		wolfTargetId = null;
 		seerTargetId = null;
 		lastNight = null;
+		lastKnightStrike = null;
 		dawnReport = null;
 
 		livesAtNightStart.clear();

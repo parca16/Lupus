@@ -9,6 +9,8 @@ public final class GamePlayer {
 	private int lives;
 	private boolean alive = true;
 	private boolean president;
+	private boolean knightReacted;
+	private String loverId;
 
 	GamePlayer(String id, String nickname, int lives) {
 		this.id = id;
@@ -54,5 +56,21 @@ public final class GamePlayer {
 
 	void president(boolean president) {
 		this.president = president;
+	}
+
+	public String loverId() {
+		return loverId;
+	}
+
+	void loverId(String loverId) {
+		this.loverId = loverId;
+	}
+
+	boolean knightReacted() {
+		return knightReacted;
+	}
+
+	void knightReacted(boolean knightReacted) {
+		this.knightReacted = knightReacted;
 	}
 }
