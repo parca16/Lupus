@@ -179,6 +179,11 @@ public final class Game {
 		return phase == Phase.FINISHED;
 	}
 
+	/** Jugadores de la partida, en orden de entrada. */
+	public List<GamePlayer> players() {
+		return List.copyOf(players.values());
+	}
+
 	/** Elige al Presidente antes del reparto (regla D3). */
 	public void electPresident(String playerId) {
 		electPresident(playerId, clock.instant());
@@ -766,8 +771,7 @@ public final class Game {
 	}
 
 	/** Vista de la partida para un jugador; solo incluye su propio rol. */
-	public GameView viewFor(String playerId) {
-		GamePlayer player = requirePlayer(playerId);
+	public GameView viewFor(String playerId) {		GamePlayer player = requirePlayer(playerId);
 
 		List<GameView.PublicPlayer> publicPlayers = players.values().stream()
 				.map(other -> new GameView.PublicPlayer(other.id(), other.nickname(), other.lives(),
