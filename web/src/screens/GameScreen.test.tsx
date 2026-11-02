@@ -109,6 +109,128 @@ describe('GameScreen', () => {
     expect(screen.getByText(/es tu turno/i)).toBeInTheDocument()
   })
 
+  it('no muestra el panel nocturno si el paso no es de tu rol', () => {
+    renderGame({ game: estado({ phase: 'NIGHT', nightStep: 'SEER', role: 'VILLAGER' }) })
+
+    expect(screen.getByText(/turno de/i)).toHaveTextContent(/Vidente/i)
+    expect(screen.queryByText('Tu turno: Vidente')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Confirmar' })).not.toBeInTheDocument()
+  })
+
+  it('permite al Vidente elegir objetivo y confirma el envío', () => {
+    const value = renderGame({
+      game: estado({ phase: 'NIGHT', nightStep: 'SEER', role: 'SEER' }),
+    })
+
+    expect(screen.getByText('Tu turno: Vidente')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Confirmar' })).toBeDisabled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Marta' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }))
+
+    expect(value.gameAction).toHaveBeenCalledWith('night_action', {
+      kind: 'seer',
+      targetId: 'p3',
+    })
+    expect(screen.getByRole('status')).toHaveTextContent(/acción enviada/i)
+  })
+
+  it('envía el voto de los lobos con su tipo de acción', () => {
+    const value = renderGame({
+      game: estado({ phase: 'NIGHT', nightStep: 'WOLVES', role: 'WOLF' }),
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Marta' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar ataque' }))
+
+    expect(value.gameAction).toHaveBeenCalledWith('night_action', {
+      kind: 'wolf_vote',
+      targetId: 'p3',
+    })
+  })
+
+  it('el Ángel puede protegerse a sí mismo', () => {
+    const value = renderGame({
+      game: estado({ phase: 'NIGHT', nightStep: 'GUARDIAN', role: 'GUARDIAN' }),
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ana' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar' }))
+
+    expect(value.gameAction).toHaveBeenCalledWith('night_action', {
+      kind: 'guardian',
+      targetId: 'p1',
+    })
+  })
+
+  it('Cupido exige dos enamorados distintos antes de confirmar', () => {
+    const value = renderGame({
+      game: estado({ phase: 'NIGHT', nightStep: 'CUPID', role: 'CUPID' }),
+    })
+
+    const confirmar = screen.getByRole('button', { name: 'Confirmar enamorados' })
+    expect(confirmar).toBeDisabled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ana' }))
+    expect(confirmar).toBeDisabled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Marta' }))
+    expect(confirmar).toBeEnabled()
+
+    fireEvent.click(confirmar)
+
+    expect(value.gameAction).toHaveBeenCalledWith('night_action', {
+      kind: 'cupid',
+      targetId: 'p1',
+      secondTargetId: 'p3',
+    })
+  })
+
+  it('la Bruja puede curar a la víctima de los lobos', () => {
+    const value = renderGame({
+      game: estado({
+        phase: 'NIGHT',
+        nightStep: 'WITCH',
+        role: 'WITCH',
+        witchVictim: 'p1',
+      }),
+    })
+
+    expect(screen.getByRole('button', { name: 'Curar a Ana' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Curar a Ana' }))
+
+    expect(value.gameAction).toHaveBeenCalledWith('night_action', {
+      kind: 'witch_heal',
+      targetId: 'p1',
+    })
+  })
+
+  it('la Bruja puede envenenar a un jugador', () => {
+    const value = renderGame({
+      game: estado({ phase: 'NIGHT', nightStep: 'WITCH', role: 'WITCH' }),
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Envenenar a alguien' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Marta' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar veneno' }))
+
+    expect(value.gameAction).toHaveBeenCalledWith('night_action', {
+      kind: 'witch_poison',
+      targetId: 'p3',
+    })
+  })
+
+  it('la Bruja puede guardar sus pociones', () => {
+    const value = renderGame({
+      game: estado({ phase: 'NIGHT', nightStep: 'WITCH', role: 'WITCH' }),
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'No usar poción' }))
+
+    expect(value.gameAction).toHaveBeenCalledWith('night_action', { kind: 'witch_none' })
+  })
+
   it('ofrece el botón de listo durante el debate', () => {
     const value = renderGame({ game: estado({ phase: 'DEBATE', role: 'VILLAGER' }) })
 

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { NightActionPanel } from '../components/NightActionPanel'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import {
@@ -43,6 +44,7 @@ export function GameScreen() {
   }
 
   const phaseKey = `${game.phase}-${game.round}`
+  const nightKey = `${game.phase}-${game.round}-${game.nightStep}`
   const revelada = revealedKey === phaseKey
   const yo = game.statuses.find((player) => player.id === playerId)
   const vivos = game.statuses.filter((player) => player.alive && player.id !== playerId)
@@ -144,6 +146,15 @@ export function GameScreen() {
             </p>
           ) : null}
         </Card>
+      ) : null}
+
+      {game.phase === 'NIGHT' && esMiTurno && yo?.alive ? (
+        <NightActionPanel
+          key={nightKey}
+          game={game}
+          playerId={playerId}
+          onAction={gameAction}
+        />
       ) : null}
 
       {game.phase === 'PRESIDENT_ELECTION' ? (
