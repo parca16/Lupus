@@ -54,6 +54,7 @@ public final class Game {
 	private String presidentId;
 	private Outcome outcome;
 	private VoteResult lastVoteResult;
+	private int lastVoteRound;
 	private LynchResult lastLynch;
 	private String pendingKnightId;
 	private Phase knightReturnPhase;
@@ -616,6 +617,7 @@ public final class Game {
 			throw new GameRuleException(GameRuleException.NOT_YOUR_TURN, "No hay votacion en curso.");
 		}
 
+		lastVoteRound = round;
 		boolean runoff = phase == Phase.RUNOFF;
 		VoteResult result = contarVotos(runoff);
 		this.lastVoteResult = result;
@@ -648,6 +650,11 @@ public final class Game {
 
 	public VoteResult lastVoteResult() {
 		return lastVoteResult;
+	}
+
+	/** Ronda en la que se cerro la ultima votacion; 0 si aun no hay ninguna. */
+	public int lastVoteRound() {
+		return lastVoteRound;
 	}
 
 	public LynchResult lastLynch() {

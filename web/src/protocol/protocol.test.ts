@@ -85,6 +85,14 @@ describe('protocolo (contrato compartido)', () => {
     expect(isMessage({ ...base, roles: 'seer' })).toBe(false)
   })
 
+  it('valida el recuento de votos del estado de partida', () => {
+    const base = contract.messages.game_state.example
+
+    expect(isMessage({ ...base, lastVoteCounts: [{ playerId: 'p1', votes: 2 }] })).toBe(true)
+    expect(isMessage({ ...base, lastVoteCounts: [{ playerId: 'p1', votes: '2' }] })).toBe(false)
+    expect(isMessage({ ...base, runoffCandidates: [1] })).toBe(false)
+  })
+
   it('crea mensajes válidos y los recupera tras serializar', () => {
     const echo = createMessage('echo', { text: 'hola' }, { id: 'id-1', at: 42 })
 

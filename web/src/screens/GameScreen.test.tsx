@@ -28,6 +28,15 @@ function estado(overrides: Partial<GameStateMessage> = {}): GameStateMessage {
     vision: '',
     witchVictim: '',
     pendingKnight: '',
+    myVote: '',
+    hasVoted: false,
+    runoffCandidates: [],
+    lastVoteRound: 0,
+    lastVoteRunoffNeeded: false,
+    lastVoteLynchedId: '',
+    lastVoteTied: [],
+    lastVoteAbstentions: 0,
+    lastVoteCounts: [],
     ready: [],
     statuses: STATUSES,
     ...overrides,
@@ -237,6 +246,114 @@ describe('GameScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Listo para votar' }))
 
     expect(value.gameAction).toHaveBeenCalledWith('ready')
+  })
+
+  it('permite votar y confirma el envío sin revelar otros votos', () => {
+    const value = renderGame({ game: estado({ phase: 'VOTING', role: 'VILLAGER' }) })
+
+    expect(screen.getByText('¿A quién linchamos?')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Confirmar voto' })).toBeDisabled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Marta' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirmar voto' }))
+
+    expect(value.gameAction).toHaveBeenCalledWith('vote', { targetId: 'p3' })
+    expect(screen.getByRole('status')).toHaveTextContent(/voto enviado/i)
+  })
+
+  it('permite abstenerse en la votación', () => {
+    const value = renderGame({ game: estado({ phase: 'VOTING', role: 'VILLAGER' }) })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Abstenerse' }))
+
+    expect(value.gameAction).toHaveBeenCalledWith('vote', {})
+  })
+
+  it('muestra solo tu propio voto después de votar', () => {
+    renderGame({
+      game: estado({ phase: 'VOTING', role: 'VILLAGER', hasVoted: true, myVote: 'p3' }),
+    })
+
+    expect(screen.getByRole('status')).toHaveTextContent(/Tu voto: Marta/i)
+    expect(screen.queryByRole('button', { name: 'Confirmar voto' })).not.toBeInTheDocument()
+  })
+
+  it('en la segunda vuelta solo ofrece a los empatados', () => {
+    const statuses = [
+      ...STATUSES,
+      { id: 'p4', nickname: 'Pablo', lives: 1, alive: true, president: false },
+    ]
+    renderGame({
+      game: estado({
+        phase: 'RUNOFF',
+        role: 'VILLAGER',
+        runoffCandidates: ['p3'],
+        statuses,
+      }),
+    })
+
+    expect(screen.getByText('Vota entre los empatados')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Marta' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Pablo' })).not.toBeInTheDocument()
+  })
+
+  it('muestra el recuento y el resultado al cerrar la votación', () => {
+    renderGame({
+      game: estado({
+        phase: 'NIGHT',
+        round: 2,
+        role: 'VILLAGER',
+        lastVoteRound: 1,
+        lastVoteLynchedId: 'p3',
+        lastVoteCounts: [
+          { playerId: 'p3', votes: 3 },
+          { playerId: 'p1', votes: 1 },
+        ],
+        lastVoteAbstentions: 1,
+      }),
+    })
+
+    expect(screen.getByText('Resultado de la votación')).toBeInTheDocument()
+    expect(screen.getByText(/Más votado:/)).toHaveTextContent(/Marta/i)
+    expect(screen.getByText('3 votos')).toBeInTheDocument()
+    expect(screen.getByText(/Abstenciones: 1/)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar' }))
+
+    expect(screen.queryByText('Resultado de la votación')).not.toBeInTheDocument()
+  })
+
+  it('explica el empate que lleva a la segunda vuelta', () => {
+    renderGame({
+      game: estado({
+        phase: 'RUNOFF',
+        role: 'VILLAGER',
+        lastVoteRound: 1,
+        lastVoteRunoffNeeded: true,
+        lastVoteTied: ['p1', 'p3'],
+        runoffCandidates: ['p1', 'p3'],
+        lastVoteCounts: [
+          { playerId: 'p1', votes: 2 },
+          { playerId: 'p3', votes: 2 },
+        ],
+      }),
+    })
+
+    expect(screen.getByText(/Empate entre/)).toHaveTextContent(/Ana y Marta/i)
+  })
+
+  it('no muestra el resultado antiguo durante el debate', () => {
+    renderGame({
+      game: estado({
+        phase: 'DEBATE',
+        role: 'VILLAGER',
+        lastVoteRound: 1,
+        lastVoteLynchedId: 'p3',
+        lastVoteCounts: [{ playerId: 'p3', votes: 3 }],
+      }),
+    })
+
+    expect(screen.queryByText('Resultado de la votación')).not.toBeInTheDocument()
   })
 
   it('avisa si no hay partida', () => {

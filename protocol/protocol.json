@@ -317,7 +317,7 @@
     },
     "game_state": {
       "direction": "s2c",
-      "summary": "Estado personalizado: fase, plazos, tu rol privado y el estado público.",
+      "summary": "Estado personalizado: fase, plazos, tu rol privado, tu voto y el estado público.",
       "fields": {
         "roomCode": "string",
         "phase": "string",
@@ -329,6 +329,15 @@
         "vision": "string",
         "witchVictim": "string",
         "pendingKnight": "string",
+        "myVote": "string",
+        "hasVoted": "boolean",
+        "runoffCandidates": "array",
+        "lastVoteRound": "number",
+        "lastVoteRunoffNeeded": "boolean",
+        "lastVoteLynchedId": "string",
+        "lastVoteTied": "array",
+        "lastVoteAbstentions": "number",
+        "lastVoteCounts": "array",
         "ready": "array",
         "statuses": "array"
       },
@@ -347,6 +356,15 @@
         "vision": "",
         "witchVictim": "",
         "pendingKnight": "",
+        "myVote": "",
+        "hasVoted": false,
+        "runoffCandidates": [],
+        "lastVoteRound": 0,
+        "lastVoteRunoffNeeded": false,
+        "lastVoteLynchedId": "",
+        "lastVoteTied": [],
+        "lastVoteAbstentions": 0,
+        "lastVoteCounts": [],
         "ready": [],
         "statuses": [
           {
