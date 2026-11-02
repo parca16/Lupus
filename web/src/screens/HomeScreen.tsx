@@ -13,7 +13,7 @@ const NICKNAME_MAX = 16
 const CODE_LENGTH = 6
 
 export function HomeScreen() {
-  const { createRoom, joinRoom, status, error, notice, restoring, roomCode, clearError } = useSession()
+  const { createRoom, joinRoom, status, error, notice, restoring, roomCode, game, clearError } = useSession()
   const navigate = useNavigate()
 
   const [mode, setMode] = useState<Mode>('create')
@@ -22,6 +22,12 @@ export function HomeScreen() {
   const [localError, setLocalError] = useState<string | null>(null)
 
   const busy = status === 'connecting'
+
+  useEffect(() => {
+    if (game) {
+      navigate('/game')
+    }
+  }, [game, navigate])
 
   useEffect(() => {
     if (roomCode) {

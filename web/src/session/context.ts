@@ -1,6 +1,18 @@
 import { createContext } from 'react'
-import type { GameSettings, Player } from '../protocol'
+import type {
+  GameDawnMessage,
+  GameOverMessage,
+  GameSettings,
+  GameStateMessage,
+  Player,
+} from '../protocol'
 import type { SocketStatus } from '../ws/socket'
+
+export interface GameActionOptions {
+  kind?: string
+  targetId?: string
+  secondTargetId?: string
+}
 
 export interface SessionValue {
   status: SocketStatus
@@ -9,6 +21,9 @@ export interface SessionValue {
   playerId: string | null
   players: Player[]
   settings: GameSettings | null
+  game: GameStateMessage | null
+  dawn: GameDawnMessage | null
+  gameOver: GameOverMessage | null
   starting: boolean
   restoring: boolean
   error: string | null
@@ -18,6 +33,7 @@ export interface SessionValue {
   kickPlayer: (playerId: string) => void
   updateSettings: (settings: GameSettings) => void
   startGame: () => void
+  gameAction: (action: string, options?: GameActionOptions) => void
   leave: () => void
   clearError: () => void
 }
