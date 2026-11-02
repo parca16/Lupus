@@ -3,16 +3,18 @@ package com.parca16.lupus.game;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.random.RandomGenerator;
 
 import com.parca16.lupus.room.GameSettings;
 
 /**
- * Partida en curso: jugadores, fases, temporizadores y reparto de roles.
+ * Partida en curso: jugadores, fases, temporizadores, reparto de roles y acciones de noche.
  *
  * <p>Es dominio puro: no conoce WebSocket ni Spring. El servidor es la unica autoridad y cada
  * jugador recibe su propia {@link GameView}, que nunca incluye los roles ajenos.
@@ -33,6 +35,7 @@ public final class Game {
 	private final Clock clock;
 	private final RandomGenerator random;
 	private final Map<String, GamePlayer> players = new LinkedHashMap<>();
+	private final Map<String, NightAction> nightActions = new LinkedHashMap<>();
 
 	private Phase phase;
 	private NightStep nightStep;
@@ -40,6 +43,14 @@ public final class Game {
 	private int round;
 	private String presidentId;
 	private Outcome outcome;
+	private String wolfTargetId;
+	private String seerTargetId;
+	private NightResult lastNight;
+	private int guardianProtections;
+	private String lastGuardianTargetId;
+	private int lastGuardianRound = -1;
+	private boolean witchHealUsed;
+	private boolean witchPoisonUsed;
 
 	private Game(String roomCode, GameSettings settings, Clock clock, RandomGenerator random) {
 		this.roomCode = roomCode;
@@ -50,29 +61,62 @@ public final class Game {
 
 	public static Game start(String roomCode, GameSettings settings, List<GameParticipant> participants, Clock clock,
 			RandomGenerator random) {
-		Objects.requireNonNull(roomCode, "roomCode");
 		Objects.requireNonNull(settings, "settings");
 		Objects.requireNonNull(participants, "participants");
-		Objects.requireNonNull(clock, "clock");
-		Objects.requireNonNull(random, "random");
-
 		settings.validatedForStart(participants.size());
 
-		Game game = new Game(roomCode, settings, clock, random);
+		Game game = new Game(Objects.requireNonNull(roomCode, "roomCode"), settings,
+				Objects.requireNonNull(clock, "clock"), Objects.requireNonNull(random, "random"));
+
 		for (GameParticipant participant : participants) {
-			if (game.players.putIfAbsent(participant.id(),
-					new GamePlayer(participant.id(), participant.nickname(), settings.lives())) != null) {
+			GamePlayer player = new GamePlayer(participant.id(), participant.nickname(), settings.lives());
+			if (game.players.putIfAbsent(participant.id(), player) != null) {
 				throw new IllegalArgumentException("Jugador duplicado: " + participant.id());
 			}
 		}
 
+		game.arrancar();
+		return game;
+	}
+
+	/**
+	 * Variante con roles prefijados, pensada para tests y escenarios.
+	 *
+	 * <p>El reparto normal usa {@link #start}.
+	 */
+	static Game startWithRoles(String roomCode, GameSettings settings, List<GameParticipant> participants,
+			Map<String, Role> roles, Clock clock, RandomGenerator random) {
+		Objects.requireNonNull(settings, "settings");
+		Objects.requireNonNull(participants, "participants");
+		Objects.requireNonNull(roles, "roles");
+		settings.validatedForStart(participants.size());
+
+		Game game = new Game(Objects.requireNonNull(roomCode, "roomCode"), settings,
+				Objects.requireNonNull(clock, "clock"), Objects.requireNonNull(random, "random"));
+
+		for (GameParticipant participant : participants) {
+			Role role = roles.get(participant.id());
+			if (role == null) {
+				throw new IllegalArgumentException("Falta el rol de " + participant.id());
+			}
+			GamePlayer player = new GamePlayer(participant.id(), participant.nickname(), settings.lives());
+			player.role(role);
+			if (game.players.putIfAbsent(participant.id(), player) != null) {
+				throw new IllegalArgumentException("Jugador duplicado: " + participant.id());
+			}
+		}
+
+		game.arrancar();
+		return game;
+	}
+
+	private void arrancar() {
 		if (settings.president()) {
-			game.begin(Phase.PRESIDENT_ELECTION, clock.instant());
+			begin(Phase.PRESIDENT_ELECTION, clock.instant());
 		}
 		else {
-			game.begin(Phase.DEALING, clock.instant());
+			begin(Phase.DEALING, clock.instant());
 		}
-		return game;
 	}
 
 	public String roomCode() {
@@ -107,6 +151,10 @@ public final class Game {
 		return outcome;
 	}
 
+	public NightResult lastNight() {
+		return lastNight;
+	}
+
 	public boolean finished() {
 		return phase == Phase.FINISHED;
 	}
@@ -117,11 +165,7 @@ public final class Game {
 			throw new IllegalStateException("El Presidente solo se elige al empezar la partida");
 		}
 
-		GamePlayer elected = players.get(playerId);
-		if (elected == null) {
-			throw new IllegalArgumentException("Jugador desconocido: " + playerId);
-		}
-
+		GamePlayer elected = requirePlayer(playerId);
 		players.values().forEach(player -> player.president(false));
 		elected.president(true);
 		this.presidentId = playerId;
@@ -154,8 +198,13 @@ public final class Game {
 				begin(Phase.NIGHT, now);
 			}
 			case NIGHT -> {
+				if (nightStep == NightStep.WOLVES) {
+					resolveWolfVotes();
+				}
+
 				NightStep next = nextStep(nightStep);
 				if (next == null) {
+					resolveNight();
 					begin(Phase.DAWN, now);
 				}
 				else {
@@ -256,6 +305,62 @@ public final class Game {
 		return requirePlayer(playerId).lives();
 	}
 
+	/** Envia una accion de noche; valida fase, rol, ventana y objetivo. */
+	public void submitNightAction(String playerId, NightAction action) {
+		Objects.requireNonNull(action, "action");
+
+		if (phase != Phase.NIGHT) {
+			throw new GameRuleException(GameRuleException.NOT_YOUR_TURN, "No es la fase de noche.");
+		}
+
+		GamePlayer player = requirePlayer(playerId);
+		if (!player.alive()) {
+			throw new GameRuleException(GameRuleException.NOT_ALIVE, "Los muertos no actuan.");
+		}
+
+		switch (action) {
+			case SeerAction seer -> actuarVidente(player, seer);
+			case GuardianAction guardian -> actuarGuardian(player, guardian);
+			case WitchAction witch -> actuarBruja(player, witch);
+			case WolfVote vote -> votarLobo(player, vote);
+		}
+	}
+
+	/** Rol que ve el Vidente esta noche; vacio para el resto. */
+	public Optional<Role> seerVision(String playerId) {
+		GamePlayer player = requirePlayer(playerId);
+		if (player.role() != Role.SEER || seerTargetId == null) {
+			return Optional.empty();
+		}
+
+		GamePlayer target = players.get(seerTargetId);
+		return target == null ? Optional.empty() : Optional.ofNullable(target.role());
+	}
+
+	/** Victima elegida por los lobos; solo la ve la Bruja. */
+	public Optional<String> wolfTargetFor(String playerId) {
+		GamePlayer player = requirePlayer(playerId);
+		if (player.role() != Role.WITCH) {
+			return Optional.empty();
+		}
+		return Optional.ofNullable(wolfTargetId);
+	}
+
+	/** True si el actor (o todos los lobos) ya han actuado en el paso actual. */
+	public boolean currentStepDone() {
+		if (phase != Phase.NIGHT || nightStep == null) {
+			return false;
+		}
+
+		return switch (nightStep) {
+			case SEER -> hasAction(SeerAction.class);
+			case GUARDIAN -> hasAction(GuardianAction.class);
+			case WITCH -> hasAction(WitchAction.class);
+			case WOLVES -> allWolvesVoted();
+			case CUPID -> false;
+		};
+	}
+
 	/** Vista de la partida para un jugador; solo incluye su propio rol. */
 	public GameView viewFor(String playerId) {
 		GamePlayer player = requirePlayer(playerId);
@@ -267,6 +372,203 @@ public final class Game {
 
 		return new GameView(roomCode, phase, round, nightStep, deadline, player.id(), player.role(),
 				player.lives(), player.alive(), player.president(), publicPlayers);
+	}
+
+	private void actuarVidente(GamePlayer player, SeerAction action) {
+		requierePaso(NightStep.SEER);
+		requiereRol(player, Role.SEER);
+		requiereSinActuar(player);
+		requiereObjetivoVivo(action.targetId());
+
+		nightActions.put(player.id(), action);
+		seerTargetId = action.targetId();
+	}
+
+	private void actuarGuardian(GamePlayer player, GuardianAction action) {
+		requierePaso(NightStep.GUARDIAN);
+		requiereRol(player, Role.GUARDIAN);
+		requiereSinActuar(player);
+		requiereObjetivoVivo(action.targetId());
+
+		if (guardianProtections >= 3) {
+			throw new GameRuleException(GameRuleException.GUARDIAN_LIMIT,
+					"El Angel de la Guarda ya ha usado sus 3 protecciones.");
+		}
+		if (lastGuardianRound == round - 1 && action.targetId().equals(lastGuardianTargetId)) {
+			throw new GameRuleException(GameRuleException.REPEATED_TARGET,
+					"No puedes proteger al mismo jugador dos noches seguidas.");
+		}
+
+		guardianProtections++;
+		lastGuardianTargetId = action.targetId();
+		lastGuardianRound = round;
+		nightActions.put(player.id(), action);
+	}
+
+	private void actuarBruja(GamePlayer player, WitchAction action) {
+		requierePaso(NightStep.WITCH);
+		requiereRol(player, Role.WITCH);
+		requiereSinActuar(player);
+
+		switch (action.potion()) {
+			case NONE -> {
+			}
+			case HEAL -> {
+				if (witchHealUsed) {
+					throw new GameRuleException(GameRuleException.NO_POTIONS,
+							"La pocion de vida ya se ha usado.");
+				}
+				requiereObjetivoVivo(action.targetId());
+				witchHealUsed = true;
+			}
+			case POISON -> {
+				if (witchPoisonUsed) {
+					throw new GameRuleException(GameRuleException.NO_POTIONS,
+							"La pocion de muerte ya se ha usado.");
+				}
+				requiereObjetivoVivo(action.targetId());
+				witchPoisonUsed = true;
+			}
+		}
+
+		nightActions.put(player.id(), action);
+	}
+
+	private void votarLobo(GamePlayer player, WolfVote vote) {
+		requierePaso(NightStep.WOLVES);
+		requiereRol(player, Role.WOLF);
+		requiereObjetivoVivo(vote.targetId());
+
+		nightActions.put(player.id(), vote);
+	}
+
+	private void requierePaso(NightStep expected) {
+		if (nightStep != expected) {
+			throw new GameRuleException(GameRuleException.NOT_YOUR_TURN, "No es tu turno de actuar.");
+		}
+	}
+
+	private static void requiereRol(GamePlayer player, Role expected) {
+		if (player.role() != expected) {
+			throw new GameRuleException(GameRuleException.INVALID_ACTION,
+					"Tu rol no puede hacer esa accion.");
+		}
+	}
+
+	private void requiereSinActuar(GamePlayer player) {
+		if (nightActions.containsKey(player.id())) {
+			throw new GameRuleException(GameRuleException.ALREADY_ACTED, "Ya has actuado esta noche.");
+		}
+	}
+
+	private void requiereObjetivoVivo(String targetId) {
+		GamePlayer target = targetId == null ? null : players.get(targetId);
+		if (target == null || !target.alive()) {
+			throw new GameRuleException(GameRuleException.INVALID_TARGET, "Objetivo invalido.");
+		}
+	}
+
+	private boolean hasAction(Class<? extends NightAction> type) {
+		return nightActions.values().stream().anyMatch(type::isInstance);
+	}
+
+	private boolean allWolvesVoted() {
+		long aliveWolves = players.values().stream()
+				.filter(player -> player.alive() && player.role() == Role.WOLF)
+				.count();
+		if (aliveWolves == 0) {
+			return true;
+		}
+		long votes = nightActions.values().stream().filter(WolfVote.class::isInstance).count();
+		return votes >= aliveWolves;
+	}
+
+	private void resolveWolfVotes() {
+		Map<String, Integer> counts = new LinkedHashMap<>();
+		for (NightAction action : nightActions.values()) {
+			if (action instanceof WolfVote vote) {
+				counts.merge(vote.targetId(), 1, Integer::sum);
+			}
+		}
+
+		if (counts.isEmpty()) {
+			wolfTargetId = null;
+			return;
+		}
+
+		int max = counts.values().stream().mapToInt(Integer::intValue).max().orElse(0);
+		List<String> tied = counts.entrySet().stream()
+				.filter(entry -> entry.getValue() == max)
+				.map(Map.Entry::getKey)
+				.toList();
+
+		wolfTargetId = tied.get(random.nextInt(tied.size()));
+	}
+
+	/** Resolucion de la noche: proteccion, ataque, pocion y muertes (#39). */
+	private void resolveNight() {
+		List<NightEvent> events = new ArrayList<>();
+		String protectedTarget = guardianTarget();
+		boolean wolfBlocked = wolfTargetId != null && wolfTargetId.equals(protectedTarget);
+
+		if (wolfTargetId != null) {
+			if (wolfBlocked) {
+				events.add(new NightEvent(NightEvent.Type.WOLF_ATTACK, wolfTargetId, true, false, null));
+			}
+			else {
+				HitResult result = hit(wolfTargetId);
+				events.add(new NightEvent(NightEvent.Type.WOLF_ATTACK, wolfTargetId, false, true, result));
+			}
+		}
+
+		WitchAction witch = witchAction();
+		GamePlayer bruja = witch == null ? null : players.get(witchActorId());
+		if (witch != null && bruja != null && bruja.alive()) {
+			switch (witch.potion()) {
+				case HEAL -> {
+					boolean applied = heal(witch.targetId());
+					events.add(new NightEvent(NightEvent.Type.HEAL, witch.targetId(), false, applied, null));
+				}
+				case POISON -> {
+					boolean blocked = witch.targetId() != null && witch.targetId().equals(protectedTarget);
+					if (blocked) {
+						events.add(new NightEvent(NightEvent.Type.POISON, witch.targetId(), true, false, null));
+					}
+					else {
+						HitResult result = hit(witch.targetId());
+						events.add(new NightEvent(NightEvent.Type.POISON, witch.targetId(), false, true, result));
+					}
+				}
+				case NONE -> {
+				}
+			}
+		}
+
+		lastNight = new NightResult(wolfTargetId, wolfBlocked, events);
+	}
+
+	private String guardianTarget() {
+		return nightActions.values().stream()
+				.filter(GuardianAction.class::isInstance)
+				.map(NightAction::targetId)
+				.findFirst()
+				.orElse(null);
+	}
+
+	private WitchAction witchAction() {
+		return nightActions.values().stream()
+				.filter(WitchAction.class::isInstance)
+				.map(WitchAction.class::cast)
+				.findFirst()
+				.orElse(null);
+	}
+
+	private String witchActorId() {
+		return nightActions.entrySet().stream()
+				.filter(entry -> entry.getValue() instanceof WitchAction)
+				.map(Map.Entry::getKey)
+				.findFirst()
+				.orElse(null);
 	}
 
 	private GamePlayer requirePlayer(String playerId) {
@@ -289,6 +591,7 @@ public final class Game {
 			case PRESIDENT_ELECTION -> this.deadline = now.plus(PRESIDENT_ELECTION_TIME);
 			case REVEAL -> this.deadline = now.plus(REVEAL_TIME);
 			case NIGHT -> {
+				resetNight();
 				NightStep first = firstStep();
 				if (first == null) {
 					begin(Phase.DAWN, now);
@@ -313,6 +616,13 @@ public final class Game {
 
 		RoleDealer.deal(settings, List.copyOf(players.keySet()), random)
 				.forEach((playerId, role) -> players.get(playerId).role(role));
+	}
+
+	private void resetNight() {
+		nightActions.clear();
+		wolfTargetId = null;
+		seerTargetId = null;
+		lastNight = null;
 	}
 
 	private NightStep firstStep() {
