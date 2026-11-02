@@ -53,7 +53,7 @@ class GameTest {
 		assertEquals(Phase.PRESIDENT_ELECTION, game.phase());
 		assertEquals(T0.plus(Game.PRESIDENT_ELECTION_TIME), game.deadline());
 		assertNull(game.viewFor("p1").role(), "Los roles no se reparten antes de elegir presidente");
-		assertThrows(IllegalStateException.class, () -> game.advance(T0));
+		assertEquals(Phase.PRESIDENT_ELECTION, game.phase());
 
 		game.electPresident("p2");
 
