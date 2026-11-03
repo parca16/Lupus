@@ -63,6 +63,7 @@ function Probe() {
       <span data-testid="sala">{session.roomCode ?? 'sin-sala'}</span>
       <span data-testid="jugador">{session.playerId ?? 'sin-jugador'}</span>
       <span data-testid="estado">{session.restoring ? 'recuperando' : 'lista'}</span>
+      <span data-testid="lobby">{session.returnedToLobby ? 'lobby' : 'partida'}</span>
     </div>
   )
 }
@@ -174,5 +175,33 @@ describe('SessionProvider (identidad persistente)', () => {
 
     expect(mocks.sockets).toHaveLength(0)
     expect(screen.getByTestId('estado')).toHaveTextContent('lista')
+  })
+
+  it('marca la vuelta al lobby cuando el host devuelve la sala', () => {
+    window.localStorage.setItem(
+      'lupus.session',
+      JSON.stringify({ roomCode: 'ABC234', playerId: 'p-1', nickname: 'Ana' }),
+    )
+
+    render(
+      <SessionProvider>
+        <Probe />
+      </SessionProvider>,
+    )
+
+    const socket = mocks.sockets[0]
+    act(() => {
+      socket.open()
+      socket.receive(roomState('ABC234', 'p-1'))
+      socket.receive({
+        v: 1,
+        type: 'returned_to_lobby',
+        id: 'lobby-1',
+        at: 2,
+        roomCode: 'ABC234',
+      })
+    })
+
+    expect(screen.getByTestId('lobby')).toHaveTextContent('lobby')
   })
 })

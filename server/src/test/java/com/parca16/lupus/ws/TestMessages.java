@@ -11,6 +11,7 @@ import com.parca16.lupus.protocol.LeaveRoom;
 import com.parca16.lupus.protocol.Message;
 import com.parca16.lupus.protocol.Protocol;
 import com.parca16.lupus.protocol.ResumeRoom;
+import com.parca16.lupus.protocol.ReturnToLobby;
 import com.parca16.lupus.protocol.StartGame;
 import com.parca16.lupus.protocol.UpdateSettings;
 
@@ -49,6 +50,10 @@ final class TestMessages {
 
 	static Message empezar() {
 		return new StartGame(Protocol.VERSION, UUID.randomUUID().toString(), System.currentTimeMillis());
+	}
+
+	static Message volverAlLobby() {
+		return new ReturnToLobby(Protocol.VERSION, UUID.randomUUID().toString(), System.currentTimeMillis());
 	}
 
 	static Message accion(String action, String kind, String targetId, String secondTargetId) {

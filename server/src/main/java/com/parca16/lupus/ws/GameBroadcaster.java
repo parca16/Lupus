@@ -14,6 +14,7 @@ import com.parca16.lupus.game.Vote;
 import com.parca16.lupus.game.VoteResult;
 import com.parca16.lupus.protocol.GameDawn;
 import com.parca16.lupus.protocol.GameOver;
+import com.parca16.lupus.protocol.GameRole;
 import com.parca16.lupus.protocol.GameState;
 import com.parca16.lupus.protocol.GameStatus;
 import com.parca16.lupus.protocol.GameVoteCount;
@@ -55,13 +56,23 @@ public class GameBroadcaster {
 	}
 
 	public void broadcastOver(Game game) {
-		String outcome = game.outcome() == null ? "" : game.outcome().name();
-		GameOver message = new GameOver(Protocol.VERSION, UUID.randomUUID().toString(),
-				System.currentTimeMillis(), game.roomCode(), outcome);
+		GameOver message = overFor(game);
 
 		for (GamePlayer player : game.players()) {
 			sessions.find(player.id()).ifPresent(session -> notifier.send(session, message));
 		}
+	}
+
+	/** Mensaje final con el bando ganador y todos los roles revelados. */
+	GameOver overFor(Game game) {
+		List<GameRole> roles = game.players().stream()
+				.map(player -> new GameRole(player.id(), player.nickname(),
+						player.role() == null ? "" : player.role().name()))
+				.toList();
+
+		String outcome = game.outcome() == null ? "" : game.outcome().name();
+		return new GameOver(Protocol.VERSION, UUID.randomUUID().toString(), System.currentTimeMillis(),
+				game.roomCode(), outcome, roles);
 	}
 
 	private static List<String> ids(DawnReport report, DawnEvent.Type type) {

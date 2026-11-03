@@ -46,6 +46,7 @@ public class GameTicker {
 			game.tick(now);
 
 			if (game.finished()) {
+				broadcaster.broadcastState(game);
 				broadcaster.broadcastOver(game);
 				rooms.find(roomCode).ifPresent(room -> room.state(GameState.FINISHED));
 				games.remove(roomCode);

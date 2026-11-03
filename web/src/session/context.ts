@@ -26,6 +26,7 @@ export interface SessionValue {
   gameOver: GameOverMessage | null
   starting: boolean
   restoring: boolean
+  returnedToLobby: boolean
   error: string | null
   notice: string | null
   createRoom: (nickname: string) => void
@@ -33,6 +34,7 @@ export interface SessionValue {
   kickPlayer: (playerId: string) => void
   updateSettings: (settings: GameSettings) => void
   startGame: () => void
+  returnToLobby: () => void
   gameAction: (action: string, options?: GameActionOptions) => void
   leave: () => void
   clearError: () => void

@@ -93,6 +93,17 @@ describe('protocolo (contrato compartido)', () => {
     expect(isMessage({ ...base, runoffCandidates: [1] })).toBe(false)
   })
 
+  it('valida los roles revelados al terminar la partida', () => {
+    const base = contract.messages.game_over.example
+
+    expect(
+      isMessage({ ...base, roles: [{ playerId: 'p1', nickname: 'Ana', role: 'WOLF' }] }),
+    ).toBe(true)
+    expect(
+      isMessage({ ...base, roles: [{ playerId: 'p1', nickname: 'Ana', role: 7 }] }),
+    ).toBe(false)
+  })
+
   it('crea mensajes válidos y los recupera tras serializar', () => {
     const echo = createMessage('echo', { text: 'hola' }, { id: 'id-1', at: 42 })
 

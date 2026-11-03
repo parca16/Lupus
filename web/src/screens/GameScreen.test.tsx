@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
-import type { GameStateMessage } from '../protocol'
+import type { GameOverMessage, GameStateMessage } from '../protocol'
 import type { SessionValue } from '../session/context'
 import { SessionContext } from '../session/context'
 import { GameScreen } from './GameScreen'
@@ -43,6 +43,23 @@ function estado(overrides: Partial<GameStateMessage> = {}): GameStateMessage {
   }
 }
 
+function finDePartida(overrides: Partial<GameOverMessage> = {}): GameOverMessage {
+  return {
+    v: 1,
+    type: 'game_over',
+    id: 'over-1',
+    at: 2,
+    roomCode: 'ABC234',
+    outcome: 'WOLVES',
+    roles: [
+      { playerId: 'p1', nickname: 'Ana', role: 'WOLF' },
+      { playerId: 'p2', nickname: 'Luis', role: 'VILLAGER' },
+      { playerId: 'p3', nickname: 'Marta', role: 'SEER' },
+    ],
+    ...overrides,
+  }
+}
+
 function renderGame(overrides: Partial<SessionValue> = {}) {
   const value: SessionValue = {
     status: 'open',
@@ -56,6 +73,7 @@ function renderGame(overrides: Partial<SessionValue> = {}) {
     gameOver: null,
     starting: false,
     restoring: false,
+    returnedToLobby: false,
     error: null,
     notice: null,
     createRoom: vi.fn(),
@@ -63,6 +81,7 @@ function renderGame(overrides: Partial<SessionValue> = {}) {
     kickPlayer: vi.fn(),
     updateSettings: vi.fn(),
     startGame: vi.fn(),
+    returnToLobby: vi.fn(),
     gameAction: vi.fn(),
     leave: vi.fn(),
     clearError: vi.fn(),
@@ -354,6 +373,42 @@ describe('GameScreen', () => {
     })
 
     expect(screen.queryByText('Resultado de la votación')).not.toBeInTheDocument()
+  })
+
+  it('muestra el bando ganador y todos los roles revelados', () => {
+    renderGame({
+      game: estado({ phase: 'FINISHED' }),
+      gameOver: finDePartida(),
+    })
+
+    expect(screen.getByText('Ganan los lobos')).toBeInTheDocument()
+    expect(screen.getByText('Roles revelados')).toBeInTheDocument()
+    expect(screen.getByText('Lobo')).toBeInTheDocument()
+    expect(screen.getByText('Aldeano')).toBeInTheDocument()
+    expect(screen.getByText('Vidente')).toBeInTheDocument()
+  })
+
+  it('el host puede volver a la configuración sin arrancar otra partida', () => {
+    const value = renderGame({
+      game: estado({ phase: 'FINISHED' }),
+      gameOver: finDePartida(),
+      players: [{ id: 'p1', nickname: 'Ana', host: true, connected: true }],
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Volver a configuración' }))
+
+    expect(value.returnToLobby).toHaveBeenCalledTimes(1)
+  })
+
+  it('los invitados esperan a que el host vuelva a la configuración', () => {
+    renderGame({
+      game: estado({ phase: 'FINISHED' }),
+      gameOver: finDePartida(),
+      players: [{ id: 'p1', nickname: 'Ana', host: false, connected: true }],
+    })
+
+    expect(screen.getByText(/Esperando a que el host/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Volver a configuración' })).not.toBeInTheDocument()
   })
 
   it('avisa si no hay partida', () => {

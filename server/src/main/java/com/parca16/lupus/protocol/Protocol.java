@@ -35,6 +35,8 @@ public final class Protocol {
 			Map.entry("update_settings", UpdateSettings.class),
 			Map.entry("room_settings", RoomSettings.class),
 			Map.entry("start_game", StartGame.class),
+			Map.entry("return_to_lobby", ReturnToLobby.class),
+			Map.entry("returned_to_lobby", ReturnedToLobby.class),
 			Map.entry("game_starting", GameStarting.class),
 			Map.entry("game_state", GameState.class),
 			Map.entry("game_dawn", GameDawn.class),

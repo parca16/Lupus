@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
+import { GameOverPanel } from '../components/GameOverPanel'
 import { NightActionPanel } from '../components/NightActionPanel'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
@@ -26,10 +27,18 @@ const STATUS: Record<SocketStatus, { label: string; dot: string }> = {
 }
 
 export function GameScreen() {
-  const { game, playerId, status, error, gameAction } = useSession()
+  const { game, playerId, status, error, gameAction, gameOver, returnedToLobby } = useSession()
   const [revealedKey, setRevealedKey] = useState<string | null>(null)
   const [presidentVote, setPresidentVote] = useState<{ key: string; targetId: string } | null>(null)
   const remaining = useCountdown(game?.deadline ?? 0)
+
+  if (returnedToLobby) {
+    return <Navigate to="/lobby" replace />
+  }
+
+  if (gameOver) {
+    return <GameOverPanel />
+  }
 
   if (!game) {
     return (

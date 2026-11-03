@@ -301,6 +301,31 @@
         "at": 1700000001500
       }
     },
+    "return_to_lobby": {
+      "direction": "c2s",
+      "summary": "El host devuelve la sala a la configuracion tras terminar la partida, sin arrancar otra.",
+      "fields": {},
+      "example": {
+        "v": 1,
+        "type": "return_to_lobby",
+        "id": "00000000-0000-0000-0000-000000000023",
+        "at": 1700000001900
+      }
+    },
+    "returned_to_lobby": {
+      "direction": "s2c",
+      "summary": "La sala ha vuelto al lobby con los mismos jugadores.",
+      "fields": {
+        "roomCode": "string"
+      },
+      "example": {
+        "v": 1,
+        "type": "returned_to_lobby",
+        "id": "00000000-0000-0000-0000-000000000024",
+        "at": 1700000002000,
+        "roomCode": "ABC234"
+      }
+    },
     "game_starting": {
       "direction": "s2c",
       "summary": "La partida empieza; el lobby deja paso al juego.",
@@ -401,10 +426,11 @@
     },
     "game_over": {
       "direction": "s2c",
-      "summary": "Fin de la partida con el bando ganador.",
+      "summary": "Fin de la partida con el bando ganador y todos los roles revelados.",
       "fields": {
         "roomCode": "string",
-        "outcome": "string"
+        "outcome": "string",
+        "roles": "array"
       },
       "example": {
         "v": 1,
@@ -412,7 +438,14 @@
         "id": "00000000-0000-0000-0000-000000000021",
         "at": 1700000005000,
         "roomCode": "ABC234",
-        "outcome": "VILLAGE"
+        "outcome": "VILLAGE",
+        "roles": [
+          {
+            "playerId": "00000000-0000-0000-0000-0000000000bb",
+            "nickname": "Ana",
+            "role": "WOLF"
+          }
+        ]
       }
     },
     "game_action": {

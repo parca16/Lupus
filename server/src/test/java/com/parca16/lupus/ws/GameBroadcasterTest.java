@@ -15,7 +15,9 @@ import org.junit.jupiter.api.Test;
 
 import com.parca16.lupus.game.Game;
 import com.parca16.lupus.game.GameParticipant;
+import com.parca16.lupus.game.Outcome;
 import com.parca16.lupus.game.Phase;
+import com.parca16.lupus.protocol.GameOver;
 import com.parca16.lupus.protocol.GameState;
 import com.parca16.lupus.room.GameSettings;
 import com.parca16.lupus.room.RoomRegistry;
@@ -82,6 +84,20 @@ class GameBroadcasterTest {
 		assertEquals(2, estado.lastVoteTied().size());
 		assertEquals("", estado.myVote(), "La segunda vuelta empieza sin votos");
 		assertFalse(estado.hasVoted());
+	}
+
+	@Test
+	void elFinalRevelaElBandoYLosRolesDeTodos() {
+		Game game = enVotacion();
+		game.finish(Outcome.VILLAGE);
+
+		GameOver fin = broadcaster.overFor(game);
+
+		assertEquals("VILLAGE", fin.outcome());
+		assertEquals(6, fin.roles().size());
+		assertEquals("Jugador1", fin.roles().get(0).nickname());
+		assertTrue(fin.roles().stream().allMatch(role -> !role.role().isEmpty()));
+		assertTrue(fin.roles().stream().anyMatch(role -> role.role().equals("WOLF")));
 	}
 
 	private static int votosDe(GameState estado, String playerId) {
