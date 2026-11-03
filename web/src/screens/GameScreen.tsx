@@ -18,6 +18,7 @@ import {
   STEP_ROLE,
 } from '../game/labels'
 import { formatCountdown, useCountdown } from '../hooks/useCountdown'
+import { useGameSounds } from '../hooks/useGameSounds'
 import { useSession } from '../session/useSession'
 import type { SocketStatus } from '../ws/socket'
 
@@ -31,6 +32,7 @@ const STATUS: Record<SocketStatus, { label: string; dot: string }> = {
 
 export function GameScreen() {
   const { game, playerId, status, error, gameAction, gameOver, returnedToLobby } = useSession()
+  const { muted, toggleMuted } = useGameSounds()
   const [revealedKey, setRevealedKey] = useState<string | null>(null)
   const [presidentVote, setPresidentVote] = useState<{ key: string; targetId: string } | null>(null)
   const remaining = useCountdown(game?.deadline ?? 0)
@@ -96,10 +98,20 @@ export function GameScreen() {
           </div>
 
           <div className="flex flex-col items-end gap-2">
-            <span className="inline-flex items-center gap-2 rounded-full border border-night-700 px-3 py-1 text-xs text-parchment/70">
-              <span className={`h-2 w-2 rounded-full ${estado.dot}`} aria-hidden="true" />
-              {estado.label}
-            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                className="px-2 py-1 text-lg"
+                onClick={toggleMuted}
+                aria-label={muted ? 'Activar sonidos' : 'Silenciar sonidos'}
+              >
+                {muted ? '🔇' : '🔊'}
+              </Button>
+              <span className="inline-flex items-center gap-2 rounded-full border border-night-700 px-3 py-1 text-xs text-parchment/70">
+                <span className={`h-2 w-2 rounded-full ${estado.dot}`} aria-hidden="true" />
+                {estado.label}
+              </span>
+            </div>
             {game.deadline > 0 ? (
               <span className="font-mono text-2xl font-semibold text-parchment">
                 {formatCountdown(remaining)}
