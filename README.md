@@ -55,6 +55,15 @@ npm run dev
 
 Abre la URL que imprime Vite (normalmente <http://localhost:5173>).
 
+### Docker
+
+```bash
+docker compose up --build
+```
+
+Web en <http://localhost:8081> y servidor en <http://localhost:8080>. Más detalles de despliegue
+(Fly.io, dominio, HTTPS/WSS y variables) en [`docs/despliegue.md`](docs/despliegue.md).
+
 ## Roadmap
 
 El trabajo está planificado en **milestones** e **issues**:
