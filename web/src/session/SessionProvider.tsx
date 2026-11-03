@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type {
+  ChatMessage,
   GameAnnouncementMessage,
   GameDawnMessage,
   GameOverMessage,
@@ -47,6 +48,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<GameSettings | null>(null)
   const [game, setGame] = useState<GameStateMessage | null>(null)
   const [announcements, setAnnouncements] = useState<GameAnnouncementMessage[]>([])
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [dawn, setDawn] = useState<GameDawnMessage | null>(null)
   const [gameOver, setGameOver] = useState<GameOverMessage | null>(null)
   const [starting, setStarting] = useState(false)
@@ -70,6 +72,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setSettings(null)
     setGame(null)
     setAnnouncements([])
+    setChatMessages([])
     setDawn(null)
     setGameOver(null)
     setStarting(false)
@@ -165,6 +168,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
               setStarting(true)
               setReturnedToLobby(false)
               setAnnouncements([])
+              setChatMessages([])
               break
             case 'game_state':
               setGame(message)
@@ -172,6 +176,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
               break
             case 'game_announcement':
               setAnnouncements((previous) => [...previous, message].slice(-50))
+              break
+            case 'chat_message':
+              setChatMessages((previous) => [...previous, message].slice(-200))
               break
             case 'game_dawn':
               setDawn(message)
@@ -182,6 +189,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             case 'returned_to_lobby':
               setGame(null)
               setAnnouncements([])
+              setChatMessages([])
               setDawn(null)
               setGameOver(null)
               setStarting(false)
@@ -273,6 +281,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     socketRef.current?.send('return_to_lobby', {})
   }, [])
 
+  const sendChat = useCallback((channel: string, text: string) => {
+    socketRef.current?.send('chat_send', { channel, text })
+  }, [])
+
   const gameAction = useCallback((action: string, options: GameActionOptions = {}) => {
     socketRef.current?.send('game_action', {
       action,
@@ -310,6 +322,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       settings,
       game,
       announcements,
+      chatMessages,
       dawn,
       gameOver,
       starting,
@@ -323,6 +336,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       updateSettings,
       startGame,
       returnToLobby,
+      sendChat,
       gameAction,
       leave,
       clearError,
@@ -336,6 +350,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       settings,
       game,
       announcements,
+      chatMessages,
       dawn,
       gameOver,
       starting,
@@ -349,6 +364,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       updateSettings,
       startGame,
       returnToLobby,
+      sendChat,
       gameAction,
       leave,
       clearError,

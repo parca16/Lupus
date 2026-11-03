@@ -70,6 +70,7 @@ function renderGame(overrides: Partial<SessionValue> = {}) {
     settings: null,
     game: estado(),
     announcements: [],
+    chatMessages: [],
     dawn: null,
     gameOver: null,
     starting: false,
@@ -83,6 +84,7 @@ function renderGame(overrides: Partial<SessionValue> = {}) {
     updateSettings: vi.fn(),
     startGame: vi.fn(),
     returnToLobby: vi.fn(),
+    sendChat: vi.fn(),
     gameAction: vi.fn(),
     leave: vi.fn(),
     clearError: vi.fn(),
@@ -478,6 +480,72 @@ describe('GameScreen', () => {
     renderGame()
 
     expect(screen.queryByText(/Historial de anuncios/)).not.toBeInTheDocument()
+  })
+
+  it('permite escribir en el chat público durante la votación', () => {
+    const value = renderGame({ game: estado({ phase: 'VOTING', role: 'VILLAGER' }) })
+
+    expect(screen.getByText('Chat')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Mensaje de chat'), {
+      target: { value: 'Yo voto a Marta.' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Enviar' }))
+
+    expect(value.sendChat).toHaveBeenCalledWith('public', 'Yo voto a Marta.')
+  })
+
+  it('de noche solo los lobos tienen chat de manada', () => {
+    renderGame({ game: estado({ phase: 'NIGHT', role: 'WOLF' }) })
+
+    expect(screen.getByRole('button', { name: 'Lobos' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Público' })).not.toBeInTheDocument()
+  })
+
+  it('un aldeano no tiene chat durante la noche', () => {
+    renderGame({ game: estado({ phase: 'NIGHT', role: 'VILLAGER' }) })
+
+    expect(screen.queryByText('Chat')).not.toBeInTheDocument()
+  })
+
+  it('los enamorados tienen su canal privado', () => {
+    renderGame({ game: estado({ phase: 'NIGHT', role: 'VILLAGER', loverId: 'p3' }) })
+
+    expect(screen.getByRole('button', { name: 'Enamorados' })).toBeInTheDocument()
+  })
+
+  it('solo muestra los mensajes del canal activo', () => {
+    renderGame({
+      game: estado({ phase: 'VOTING', role: 'VILLAGER' }),
+      chatMessages: [
+        {
+          v: 1,
+          type: 'chat_message',
+          id: 'c-1',
+          at: 1,
+          roomCode: 'ABC234',
+          channel: 'public',
+          senderId: 'p3',
+          senderNickname: 'Marta',
+          text: 'Mensaje público',
+          round: 1,
+        },
+        {
+          v: 1,
+          type: 'chat_message',
+          id: 'c-2',
+          at: 2,
+          roomCode: 'ABC234',
+          channel: 'wolves',
+          senderId: 'p2',
+          senderNickname: 'Luis',
+          text: 'Mensaje de lobos',
+          round: 1,
+        },
+      ],
+    })
+
+    expect(screen.getByText('Mensaje público')).toBeInTheDocument()
+    expect(screen.queryByText('Mensaje de lobos')).not.toBeInTheDocument()
   })
 
   it('avisa si no hay partida', () => {

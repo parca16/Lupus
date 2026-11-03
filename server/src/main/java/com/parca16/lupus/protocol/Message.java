@@ -36,10 +36,12 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 		@JsonSubTypes.Type(value = GameAnnouncement.class, name = "game_announcement"),
 		@JsonSubTypes.Type(value = GameDawn.class, name = "game_dawn"),
 		@JsonSubTypes.Type(value = GameOver.class, name = "game_over"),
+		@JsonSubTypes.Type(value = ChatSend.class, name = "chat_send"),
+		@JsonSubTypes.Type(value = ChatMessage.class, name = "chat_message"),
 		@JsonSubTypes.Type(value = GameAction.class, name = "game_action")
 })
 public sealed interface Message permits Hello, Welcome, Echo, Ping, Pong, ErrorMessage, CreateRoom, JoinRoom,
 		ResumeRoom, RoomState, RoomUpdated, LeaveRoom, KickPlayer, RoomClosed, Kicked, UpdateSettings, RoomSettings,
 		StartGame, ReturnToLobby, ReturnedToLobby, GameStarting, GameState, GameAnnouncement, GameDawn, GameOver,
-		GameAction {
+		ChatSend, ChatMessage, GameAction {
 }

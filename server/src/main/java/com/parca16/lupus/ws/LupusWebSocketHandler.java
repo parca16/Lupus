@@ -29,6 +29,7 @@ import com.parca16.lupus.game.WitchAction;
 import com.parca16.lupus.game.WitchPotion;
 import com.parca16.lupus.game.WolfVote;
 import com.parca16.lupus.protocol.CreateRoom;
+import com.parca16.lupus.protocol.ChatSend;
 import com.parca16.lupus.protocol.Echo;
 import com.parca16.lupus.protocol.ErrorMessage;
 import com.parca16.lupus.protocol.GameAction;
@@ -71,15 +72,17 @@ public class LupusWebSocketHandler extends TextWebSocketHandler {
 	private final RoomNotifier notifier;
 	private final GameRegistry games;
 	private final GameBroadcaster broadcaster;
+	private final ChatService chat;
 	private final Clock clock;
 
 	public LupusWebSocketHandler(RoomRegistry rooms, PlayerSessions sessions, RoomNotifier notifier,
-			GameRegistry games, GameBroadcaster broadcaster, Clock clock) {
+			GameRegistry games, GameBroadcaster broadcaster, ChatService chat, Clock clock) {
 		this.rooms = rooms;
 		this.sessions = sessions;
 		this.notifier = notifier;
 		this.games = games;
 		this.broadcaster = broadcaster;
+		this.chat = chat;
 		this.clock = clock;
 	}
 
@@ -180,6 +183,7 @@ public class LupusWebSocketHandler extends TextWebSocketHandler {
 			case UpdateSettings updateSettings -> actualizarConfiguracion(session, updateSettings);
 			case StartGame ignored -> empezarPartida(session);
 			case ReturnToLobby ignored -> volverAlLobby(session);
+			case ChatSend chatSend -> enviarChat(session, chatSend);
 			case GameAction gameAction -> ejecutarAccion(session, gameAction);
 			default -> sendError(session, "unknown_type", "Mensaje no admitido del cliente.");
 		}
@@ -386,6 +390,13 @@ public class LupusWebSocketHandler extends TextWebSocketHandler {
 	private void sendError(WebSocketSession session, String code, String message) {
 		notifier.send(session, new ErrorMessage(Protocol.VERSION, UUID.randomUUID().toString(),
 				System.currentTimeMillis(), code, message));
+	}
+
+	private void enviarChat(WebSocketSession session, ChatSend message) {
+		Room room = salaActual(session);
+		Game game = games.find(room.code()).orElseThrow(
+				() -> new RoomException(RoomException.NOT_IN_ROOM, "No hay partida en curso."));
+		chat.post(game, jugadorActual(session), message);
 	}
 
 	private void ejecutarAccion(WebSocketSession session, GameAction message) {

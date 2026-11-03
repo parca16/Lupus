@@ -11,6 +11,8 @@ public class GameRuleException extends RuntimeException {
 	public static final String REPEATED_TARGET = "repeated_target";
 	public static final String NO_POTIONS = "no_potions_left";
 	public static final String INVALID_ACTION = "invalid_action";
+	public static final String CHAT_NOT_ALLOWED = "chat_not_allowed";
+	public static final String INVALID_CHAT = "invalid_chat";
 
 	private final String code;
 
