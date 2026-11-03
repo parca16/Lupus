@@ -69,6 +69,7 @@ function renderGame(overrides: Partial<SessionValue> = {}) {
     players: [],
     settings: null,
     game: estado(),
+    announcements: [],
     dawn: null,
     gameOver: null,
     starting: false,
@@ -440,6 +441,43 @@ describe('GameScreen', () => {
 
     expect(screen.getByText('Pulsa para revelar')).toBeInTheDocument()
     expect(screen.queryByText('Glosario de roles')).not.toBeInTheDocument()
+  })
+
+  it('muestra el último anuncio y su historial', () => {
+    renderGame({
+      announcements: [
+        {
+          v: 1,
+          type: 'game_announcement',
+          id: 'a-1',
+          at: 1,
+          roomCode: 'ABC234',
+          round: 1,
+          kind: 'PHASE',
+          text: 'El pueblo duerme.',
+        },
+        {
+          v: 1,
+          type: 'game_announcement',
+          id: 'a-2',
+          at: 2,
+          roomCode: 'ABC234',
+          round: 1,
+          kind: 'DEATH',
+          text: 'Luis no ha despertado esta noche.',
+        },
+      ],
+    })
+
+    expect(screen.getByText('Luis no ha despertado esta noche.')).toBeInTheDocument()
+    expect(screen.getByText('El pueblo duerme.')).toBeInTheDocument()
+    expect(screen.getByText('Historial de anuncios (1)')).toBeInTheDocument()
+  })
+
+  it('no muestra anuncios si no hay ninguno', () => {
+    renderGame()
+
+    expect(screen.queryByText(/Historial de anuncios/)).not.toBeInTheDocument()
   })
 
   it('avisa si no hay partida', () => {

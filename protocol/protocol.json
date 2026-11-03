@@ -424,6 +424,26 @@
         "quiet": false
       }
     },
+    "game_announcement": {
+      "direction": "s2c",
+      "summary": "Anuncio del narrador pasivo: texto plantillado de fase o suceso.",
+      "fields": {
+        "roomCode": "string",
+        "round": "number",
+        "kind": "string",
+        "text": "string"
+      },
+      "example": {
+        "v": 1,
+        "type": "game_announcement",
+        "id": "00000000-0000-0000-0000-000000000025",
+        "at": 1700000002500,
+        "roomCode": "ABC234",
+        "round": 1,
+        "kind": "PHASE",
+        "text": "El pueblo duerme. Los lobos afilan sus colmillos."
+      }
+    },
     "game_over": {
       "direction": "s2c",
       "summary": "Fin de la partida con el bando ganador y todos los roles revelados.",

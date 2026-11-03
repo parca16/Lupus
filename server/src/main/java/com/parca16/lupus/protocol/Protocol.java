@@ -39,6 +39,7 @@ public final class Protocol {
 			Map.entry("returned_to_lobby", ReturnedToLobby.class),
 			Map.entry("game_starting", GameStarting.class),
 			Map.entry("game_state", GameState.class),
+			Map.entry("game_announcement", GameAnnouncement.class),
 			Map.entry("game_dawn", GameDawn.class),
 			Map.entry("game_over", GameOver.class),
 			Map.entry("game_action", GameAction.class));

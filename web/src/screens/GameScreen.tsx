@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
+import { AnnouncementFeed } from '../components/AnnouncementFeed'
 import { GameOverPanel } from '../components/GameOverPanel'
 import { NightActionPanel } from '../components/NightActionPanel'
 import { RolePanel } from '../components/RolePanel'
@@ -112,6 +113,8 @@ export function GameScreen() {
           {error}
         </p>
       ) : null}
+
+      <AnnouncementFeed />
 
       {yo && !yo.alive ? (
         <Card className="border-blood/40 text-center">

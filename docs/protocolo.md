@@ -56,6 +56,7 @@ Ejemplo:
 | `returned_to_lobby` | servidor → cliente | `roomCode` | La sala ha vuelto al lobby; la partida terminada se descarta. |
 | `game_starting` | servidor → cliente | `roomCode` | La partida empieza. |
 | `game_state` | servidor → cliente | `roomCode`, `phase`, `round`, `deadline`, `nightStep`, `role`, `loverId`, `vision`, `witchVictim`, `pendingKnight`, `myVote`, `hasVoted`, `runoffCandidates`, `lastVoteRound`, `lastVoteRunoffNeeded`, `lastVoteLynchedId`, `lastVoteTied`, `lastVoteAbstentions`, `lastVoteCounts`, `ready`, `statuses` | Estado personalizado: tu rol privado, tu voto y el estado público. |
+| `game_announcement` | servidor → cliente | `roomCode`, `round`, `kind`, `text` | Anuncio plantillado del narrador pasivo. |
 | `game_dawn` | servidor → cliente | `roomCode`, `died`, `lostLife`, `healed`, `quiet` | Parte del amanecer. |
 | `game_over` | servidor → cliente | `roomCode`, `outcome`, `roles` | Fin de la partida y roles revelados. |
 | `game_action` | cliente → servidor | `action`, `kind`, `targetId`, `secondTargetId` | Acción de partida (voto, noche, listo…). |
@@ -290,6 +291,8 @@ emite `game_starting` a todos. Solo el host puede cambiar la configuración o em
   - `night_action` + `kind`: `seer`, `guardian`, `wolf_vote`, `witch_heal`, `witch_poison`,
     `witch_none` o `cupid` (con `targetId` y `secondTargetId`).
 - Al amanecer se envía `game_dawn` con las muertes, vidas perdidas y curaciones.
+- El servidor envía `game_announcement` al cambiar de fase y con cada suceso del amanecer.
+  El texto sale de plantillas con variantes (`PHASE`, `DEATH`, `LIFE_LOST`, `HEALED`, `QUIET`).
 - Al terminar se envía `game_over` con el bando ganador (`VILLAGE`, `WOLVES` o `LOVERS`) y la
   lista de roles revelados.
 - Tras el final, el host puede enviar `return_to_lobby` para volver a la configuración sin arrancar

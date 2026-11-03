@@ -10,8 +10,10 @@ import com.parca16.lupus.game.DawnReport;
 import com.parca16.lupus.game.Game;
 import com.parca16.lupus.game.GamePlayer;
 import com.parca16.lupus.game.GameView;
+import com.parca16.lupus.game.Phase;
 import com.parca16.lupus.game.Vote;
 import com.parca16.lupus.game.VoteResult;
+import com.parca16.lupus.protocol.GameAnnouncement;
 import com.parca16.lupus.protocol.GameDawn;
 import com.parca16.lupus.protocol.GameOver;
 import com.parca16.lupus.protocol.GameRole;
@@ -49,6 +51,47 @@ public class GameBroadcaster {
 				ids(report, DawnEvent.Type.LOST_LIFE),
 				ids(report, DawnEvent.Type.HEALED),
 				report.quiet());
+
+		for (GamePlayer player : game.players()) {
+			sessions.find(player.id()).ifPresent(session -> notifier.send(session, message));
+		}
+	}
+
+	/** Anuncio de la fase actual con una plantilla del narrador pasivo (#66). */
+	public void broadcastPhase(Game game) {
+		if (game.phase() == Phase.FINISHED) {
+			return;
+		}
+		broadcastAnnouncement(game, "PHASE", AnnouncementTemplates.phase(game.phase(), game.round()));
+	}
+
+	/** Anuncios de muertes, vidas perdidas, curaciones o noche tranquila (#66). */
+	public void broadcastDawnAnnouncements(Game game, DawnReport report) {
+		if (report.quiet()) {
+			broadcastAnnouncement(game, "QUIET", AnnouncementTemplates.quiet(game.round()));
+			return;
+		}
+
+		int variant = game.round();
+		for (DawnEvent event : report.events()) {
+			String kind = switch (event.type()) {
+				case DIED -> "DEATH";
+				case LOST_LIFE -> "LIFE_LOST";
+				case HEALED -> "HEALED";
+			};
+			String text = switch (event.type()) {
+				case DIED -> AnnouncementTemplates.death(event.nickname(), variant);
+				case LOST_LIFE -> AnnouncementTemplates.lostLife(event.nickname(), event.livesLeft(), variant);
+				case HEALED -> AnnouncementTemplates.healed(event.nickname(), variant);
+			};
+			broadcastAnnouncement(game, kind, text);
+			variant++;
+		}
+	}
+
+	private void broadcastAnnouncement(Game game, String kind, String text) {
+		GameAnnouncement message = new GameAnnouncement(Protocol.VERSION, UUID.randomUUID().toString(),
+				System.currentTimeMillis(), game.roomCode(), game.round(), kind, text);
 
 		for (GamePlayer player : game.players()) {
 			sessions.find(player.id()).ifPresent(session -> notifier.send(session, message));

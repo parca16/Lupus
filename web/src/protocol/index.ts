@@ -164,6 +164,14 @@ export interface GameDawnMessage extends Envelope<'game_dawn'> {
   quiet: boolean
 }
 
+/** Anuncio plantillado del narrador pasivo. */
+export interface GameAnnouncementMessage extends Envelope<'game_announcement'> {
+  roomCode: string
+  round: number
+  kind: string
+  text: string
+}
+
 /** Rol revelado al terminar la partida. */
 export interface GameRole {
   playerId: string
@@ -213,6 +221,7 @@ export type Message =
   | ReturnedToLobbyMessage
   | GameStartingMessage
   | GameStateMessage
+  | GameAnnouncementMessage
   | GameDawnMessage
   | GameOverMessage
   | GameActionMessage
@@ -296,6 +305,7 @@ export const MESSAGE_FIELDS: Record<MessageType, Record<string, FieldKind>> = {
     healed: 'array',
     quiet: 'boolean',
   },
+  game_announcement: { roomCode: 'string', round: 'number', kind: 'string', text: 'string' },
   game_over: { roomCode: 'string', outcome: 'string', roles: 'array' },
   game_action: { action: 'string', kind: 'string', targetId: 'string', secondTargetId: 'string' },
 }

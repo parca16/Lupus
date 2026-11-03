@@ -23,6 +23,7 @@ import com.parca16.lupus.game.GameRegistry;
 import com.parca16.lupus.game.GameRuleException;
 import com.parca16.lupus.game.GuardianAction;
 import com.parca16.lupus.game.NightAction;
+import com.parca16.lupus.game.Phase;
 import com.parca16.lupus.game.SeerAction;
 import com.parca16.lupus.game.WitchAction;
 import com.parca16.lupus.game.WitchPotion;
@@ -268,6 +269,7 @@ public class LupusWebSocketHandler extends TextWebSocketHandler {
 		notifier.broadcastAll(room, new GameStarting(Protocol.VERSION, UUID.randomUUID().toString(),
 				System.currentTimeMillis(), room.code()));
 		broadcaster.broadcastState(game);
+		broadcaster.broadcastPhase(game);
 	}
 
 	/** Vuelve a la configuracion conservando a los jugadores, sin arrancar otra partida (#60). */
@@ -393,6 +395,7 @@ public class LupusWebSocketHandler extends TextWebSocketHandler {
 		String playerId = jugadorActual(session);
 
 		String target = emptyToNull(message.targetId());
+		Phase before = game.phase();
 
 		switch (message.action()) {
 			case "president_vote" -> game.submitPresidentVote(playerId, target);
@@ -409,6 +412,9 @@ public class LupusWebSocketHandler extends TextWebSocketHandler {
 			broadcaster.broadcastOver(game);
 			games.remove(room.code());
 			room.state(GameState.FINISHED);
+		}
+		else if (game.phase() != before) {
+			broadcaster.broadcastPhase(game);
 		}
 	}
 
