@@ -411,6 +411,37 @@ describe('GameScreen', () => {
     expect(screen.queryByRole('button', { name: 'Volver a configuración' })).not.toBeInTheDocument()
   })
 
+  it('muestra tu carta y el glosario durante la partida', () => {
+    renderGame({ game: estado({ phase: 'NIGHT', role: 'SEER' }) })
+
+    expect(screen.getByText('Tu carta')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Vidente' })).toBeInTheDocument()
+    expect(screen.getByText('Glosario de roles')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByText('Glosario de roles'))
+
+    expect(screen.getByText('Lobo')).toBeInTheDocument()
+    expect(screen.getByText('Bruja')).toBeInTheDocument()
+    expect(screen.getByText('Presidente')).toBeInTheDocument()
+  })
+
+  it('los muertos también pueden consultar su carta y el glosario', () => {
+    const statuses = STATUSES.map((player) =>
+      player.id === 'p1' ? { ...player, alive: false } : player,
+    )
+    renderGame({ game: estado({ phase: 'NIGHT', role: 'SEER', statuses }) })
+
+    expect(screen.getByText(/Estás muerto/)).toBeInTheDocument()
+    expect(screen.getByText('Glosario de roles')).toBeInTheDocument()
+  })
+
+  it('no duplica el panel de carta durante la revelación', () => {
+    renderGame({ game: estado({ phase: 'REVEAL', role: 'SEER' }) })
+
+    expect(screen.getByText('Pulsa para revelar')).toBeInTheDocument()
+    expect(screen.queryByText('Glosario de roles')).not.toBeInTheDocument()
+  })
+
   it('avisa si no hay partida', () => {
     renderGame({ game: null })
 

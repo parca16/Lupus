@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { GameOverPanel } from '../components/GameOverPanel'
 import { NightActionPanel } from '../components/NightActionPanel'
+import { RolePanel } from '../components/RolePanel'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
 import { VotePanel } from '../components/VotePanel'
@@ -118,6 +119,10 @@ export function GameScreen() {
             Estás muerto. Puedes seguir la partida como espectador.
           </p>
         </Card>
+      ) : null}
+
+      {!enRevelacion && game.role ? (
+        <RolePanel role={game.role} loverId={game.loverId} statuses={game.statuses} />
       ) : null}
 
       {enRevelacion ? (
