@@ -10,7 +10,7 @@ export function AppLayout() {
             <h1>Lupus 🐺</h1>
           </Link>
           <span className="rounded-full border border-night-700 px-3 py-1 text-xs text-parchment/60">
-            v0.2 · Salas y lobby
+            v0.5 · Partida jugable
           </span>
         </div>
       </header>

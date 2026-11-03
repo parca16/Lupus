@@ -30,6 +30,10 @@ export interface LupusSocketOptions {
 }
 
 export function defaultWebSocketUrl(): string {
+  const configured = import.meta.env.VITE_WS_URL
+  if (configured) {
+    return configured
+  }
   const scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
   return `${scheme}//${window.location.host}/ws`
 }

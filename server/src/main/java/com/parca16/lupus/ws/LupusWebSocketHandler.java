@@ -15,6 +15,8 @@ import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.parca16.lupus.game.CupidAction;
 import com.parca16.lupus.game.Game;
@@ -67,22 +69,27 @@ import com.parca16.lupus.room.RoomRegistry;
 @Component
 public class LupusWebSocketHandler extends TextWebSocketHandler {
 
+	private static final Logger log = LoggerFactory.getLogger(LupusWebSocketHandler.class);
+
 	private final RoomRegistry rooms;
 	private final PlayerSessions sessions;
 	private final RoomNotifier notifier;
 	private final GameRegistry games;
 	private final GameBroadcaster broadcaster;
 	private final ChatService chat;
+	private final MessageRateLimiter rateLimiter;
 	private final Clock clock;
 
 	public LupusWebSocketHandler(RoomRegistry rooms, PlayerSessions sessions, RoomNotifier notifier,
-			GameRegistry games, GameBroadcaster broadcaster, ChatService chat, Clock clock) {
+			GameRegistry games, GameBroadcaster broadcaster, ChatService chat, MessageRateLimiter rateLimiter,
+			Clock clock) {
 		this.rooms = rooms;
 		this.sessions = sessions;
 		this.notifier = notifier;
 		this.games = games;
 		this.broadcaster = broadcaster;
 		this.chat = chat;
+		this.rateLimiter = rateLimiter;
 		this.clock = clock;
 	}
 
@@ -110,10 +117,17 @@ public class LupusWebSocketHandler extends TextWebSocketHandler {
 			}
 		});
 		SessionAttributes.clearMembership(session);
+		rateLimiter.forget(session.getId());
 	}
 
 	@Override
 	protected void handleTextMessage(WebSocketSession session, TextMessage message) {
+		if (!rateLimiter.allow(session.getId())) {
+			log.warn("Rate limit alcanzado para la sesion {}", session.getId());
+			sendError(session, "rate_limited", "Demasiados mensajes; espera un momento.");
+			return;
+		}
+
 		Protocol.Envelope envelope;
 		try {
 			envelope = Protocol.peek(message.getPayload());

@@ -1,0 +1,29 @@
+server {
+    listen 80;
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # SPA: cualquier ruta desconocida vuelve al index de React.
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # WebSocket del juego. En Fly, LUPUS_SERVER_URL apunta al DNS interno del servidor.
+    location /ws {
+        proxy_pass ${LUPUS_SERVER_URL};
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_read_timeout 3600s;
+    }
+
+    location /actuator/ {
+        proxy_pass ${LUPUS_SERVER_URL};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}

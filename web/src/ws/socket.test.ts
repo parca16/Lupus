@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Message } from '../protocol'
 import { LupusSocket } from './socket'
 import type { LupusSocketOptions } from './socket'
+import { defaultWebSocketUrl } from './socket'
 
 /** WebSocket falso: registra lo enviado y permite simular eventos del servidor. */
 class FakeSocket {
@@ -81,6 +82,14 @@ function parseSent(raw: string): Message {
 }
 
 describe('LupusSocket', () => {
+  it('usa VITE_WS_URL cuando está configurada para despliegues separados', () => {
+    vi.stubEnv('VITE_WS_URL', 'wss://lupus.example.com/ws')
+
+    expect(defaultWebSocketUrl()).toBe('wss://lupus.example.com/ws')
+
+    vi.unstubAllEnvs()
+  })
+
   beforeEach(() => {
     FakeSocket.instances = []
   })

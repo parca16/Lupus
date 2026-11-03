@@ -1,0 +1,21 @@
+app = "lupus-web"
+primary_region = "mad"
+
+[build]
+
+[env]
+  # DNS privado de Fly hacia la app del servidor.
+  LUPUS_SERVER_URL = "http://lupus-server.internal:8080"
+
+[http_service]
+  internal_port = 80
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory = "256mb"

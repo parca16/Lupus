@@ -1,0 +1,23 @@
+services:
+  server:
+    build: ./server
+    environment:
+      LUPUS_RATE_MAX_MESSAGES: "60"
+      LUPUS_RATE_WINDOW_MILLIS: "10000"
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: ./web
+    environment:
+      LUPUS_SERVER_URL: http://server:8080
+    ports:
+      - "8081:80"
+    depends_on:
+      server:
+        condition: service_healthy
