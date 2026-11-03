@@ -12,7 +12,7 @@ Aplicación para jugar **al juego de los lobos** (*el pueblo duerme*) con amigos
 | Build servidor | Gradle (wrapper) |
 | CI/CD | GitHub Actions |
 | Persistencia | En memoria (MVP) |
-| Despliegue | Docker + Fly.io (previsto) |
+| Despliegue | Render (backend) + Vercel (frontend) |
 
 El juego es **server-authoritative**: el servidor conoce y decide todo (roles, fases, muertes); el cliente solo renderiza. Esto evita trampas y es lo que hace que el juego funcione de verdad.
 
@@ -61,8 +61,8 @@ Abre la URL que imprime Vite (normalmente <http://localhost:5173>).
 docker compose up --build
 ```
 
-Web en <http://localhost:8081> y servidor en <http://localhost:8080>. Más detalles de despliegue
-(Fly.io, dominio, HTTPS/WSS y variables) en [`docs/despliegue.md`](docs/despliegue.md).
+Web en <http://localhost:8081> y servidor en <http://localhost:8080>. Más detalles del despliegue
+gratuito (Render + Vercel, dominio, HTTPS/WSS y variables) en [`docs/despliegue.md`](docs/despliegue.md).
 
 ## Roadmap
 
