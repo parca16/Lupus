@@ -548,6 +548,15 @@ describe('GameScreen', () => {
     expect(screen.queryByText('Mensaje de lobos')).not.toBeInTheDocument()
   })
 
+  it('permite silenciar y volver a activar los sonidos', () => {
+    window.localStorage.removeItem('lupus.muted')
+    renderGame()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Silenciar sonidos' }))
+
+    expect(screen.getByRole('button', { name: 'Activar sonidos' })).toBeInTheDocument()
+  })
+
   it('avisa si no hay partida', () => {
     renderGame({ game: null })
 
