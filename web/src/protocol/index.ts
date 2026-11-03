@@ -126,6 +126,12 @@ export interface GameStatus {
   president: boolean
 }
 
+/** Votos ponderados de un jugador en el recuento. */
+export interface GameVoteCount {
+  playerId: string
+  votes: number
+}
+
 export interface GameStateMessage extends Envelope<'game_state'> {
   roomCode: string
   phase: string
@@ -137,6 +143,15 @@ export interface GameStateMessage extends Envelope<'game_state'> {
   vision: string
   witchVictim: string
   pendingKnight: string
+  myVote: string
+  hasVoted: boolean
+  runoffCandidates: string[]
+  lastVoteRound: number
+  lastVoteRunoffNeeded: boolean
+  lastVoteLynchedId: string
+  lastVoteTied: string[]
+  lastVoteAbstentions: number
+  lastVoteCounts: GameVoteCount[]
   ready: string[]
   statuses: GameStatus[]
 }
@@ -244,6 +259,15 @@ export const MESSAGE_FIELDS: Record<MessageType, Record<string, FieldKind>> = {
     vision: 'string',
     witchVictim: 'string',
     pendingKnight: 'string',
+    myVote: 'string',
+    hasVoted: 'boolean',
+    runoffCandidates: 'array',
+    lastVoteRound: 'number',
+    lastVoteRunoffNeeded: 'boolean',
+    lastVoteLynchedId: 'string',
+    lastVoteTied: 'array',
+    lastVoteAbstentions: 'number',
+    lastVoteCounts: 'array',
     ready: 'array',
     statuses: 'array',
   },
@@ -310,6 +334,14 @@ export function isGameStatus(value: unknown): value is GameStatus {
   )
 }
 
+export function isGameVoteCount(value: unknown): value is GameVoteCount {
+  return (
+    isRecord(value) &&
+    typeof value.playerId === 'string' &&
+    typeof value.votes === 'number'
+  )
+}
+
 function matchesKind(value: unknown, kind: FieldKind): boolean {
   if (kind === 'array') {
     return Array.isArray(value)
@@ -359,7 +391,18 @@ export function isMessage(value: unknown): value is Message {
     return false
   }
 
-  for (const arrayField of ['ready', 'died', 'lostLife', 'healed'] as const) {
+  if ('lastVoteCounts' in value && !(value.lastVoteCounts as unknown[]).every(isGameVoteCount)) {
+    return false
+  }
+
+  for (const arrayField of [
+    'ready',
+    'died',
+    'lostLife',
+    'healed',
+    'runoffCandidates',
+    'lastVoteTied',
+  ] as const) {
     if (arrayField in value) {
       const items = value[arrayField]
       if (!Array.isArray(items) || !items.every((item) => typeof item === 'string')) {

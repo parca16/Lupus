@@ -10,10 +10,13 @@ import com.parca16.lupus.game.DawnReport;
 import com.parca16.lupus.game.Game;
 import com.parca16.lupus.game.GamePlayer;
 import com.parca16.lupus.game.GameView;
+import com.parca16.lupus.game.Vote;
+import com.parca16.lupus.game.VoteResult;
 import com.parca16.lupus.protocol.GameDawn;
 import com.parca16.lupus.protocol.GameOver;
 import com.parca16.lupus.protocol.GameState;
 import com.parca16.lupus.protocol.GameStatus;
+import com.parca16.lupus.protocol.GameVoteCount;
 import com.parca16.lupus.protocol.Protocol;
 
 /** Construye y envia los mensajes personalizados de la partida. */
@@ -68,7 +71,7 @@ public class GameBroadcaster {
 				.toList();
 	}
 
-	private GameState stateFor(Game game, String playerId) {
+	GameState stateFor(Game game, String playerId) {
 		GameView view = game.viewFor(playerId);
 
 		List<GameStatus> statuses = game.players().stream()
@@ -81,6 +84,13 @@ public class GameBroadcaster {
 				.map(GamePlayer::id)
 				.toList();
 
+		Vote myVote = game.voteOf(playerId).orElse(null);
+		VoteResult lastVote = game.lastVoteResult();
+		List<GameVoteCount> lastVoteCounts = lastVote == null ? List.of()
+				: lastVote.counts().entrySet().stream()
+						.map(entry -> new GameVoteCount(entry.getKey(), entry.getValue()))
+						.toList();
+
 		return new GameState(Protocol.VERSION, UUID.randomUUID().toString(), System.currentTimeMillis(),
 				game.roomCode(),
 				game.phase().name(),
@@ -92,6 +102,15 @@ public class GameBroadcaster {
 				game.seerVision(playerId).map(Enum::name).orElse(""),
 				game.wolfTargetFor(playerId).orElse(""),
 				game.pendingKnightId() == null ? "" : game.pendingKnightId(),
+				myVote == null || myVote.targetId() == null ? "" : myVote.targetId(),
+				myVote != null,
+				game.runoffCandidates(),
+				lastVote == null ? 0 : game.lastVoteRound(),
+				lastVote != null && lastVote.runoffNeeded(),
+				lastVote == null || lastVote.lynchedId() == null ? "" : lastVote.lynchedId(),
+				lastVote == null ? List.of() : lastVote.tied(),
+				lastVote == null ? 0 : lastVote.abstentions(),
+				lastVoteCounts,
 				ready,
 				statuses);
 	}

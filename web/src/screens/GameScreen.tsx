@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom'
 import { NightActionPanel } from '../components/NightActionPanel'
 import { Button } from '../components/ui/Button'
 import { Card } from '../components/ui/Card'
+import { VotePanel } from '../components/VotePanel'
+import { VoteResultCard } from '../components/VoteResultCard'
 import {
   GAME_ROLE_DESCRIPTIONS,
   GAME_ROLE_LABELS,
@@ -45,6 +47,14 @@ export function GameScreen() {
 
   const phaseKey = `${game.phase}-${game.round}`
   const nightKey = `${game.phase}-${game.round}-${game.nightStep}`
+  const resultKey = [
+    game.lastVoteRound,
+    game.lastVoteLynchedId,
+    game.lastVoteRunoffNeeded,
+    game.lastVoteAbstentions,
+    game.lastVoteTied.join(','),
+    game.lastVoteCounts.map((count) => `${count.playerId}:${count.votes}`).join(','),
+  ].join('|')
   const revelada = revealedKey === phaseKey
   const yo = game.statuses.find((player) => player.id === playerId)
   const vivos = game.statuses.filter((player) => player.alive && player.id !== playerId)
@@ -235,14 +245,15 @@ export function GameScreen() {
         </Card>
       ) : null}
 
+      <VoteResultCard key={resultKey} game={game} />
+
       {game.phase === 'VOTING' || game.phase === 'RUNOFF' ? (
-        <Card className="text-center">
-          <h3 className="text-lg font-semibold">Votación en curso</h3>
-          <p className="mt-1 text-sm text-parchment/60">
-            La interfaz de voto llega en la siguiente entrega. Mientras tanto, puedes votar por
-            WebSocket.
-          </p>
-        </Card>
+        <VotePanel
+          key={phaseKey}
+          game={game}
+          playerId={playerId}
+          onAction={gameAction}
+        />
       ) : null}
 
       <Card>

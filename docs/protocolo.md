@@ -53,7 +53,7 @@ Ejemplo:
 | `room_settings` | servidor → cliente | `roomCode` + los mismos campos | Configuración vigente (al crear, al entrar y al cambiarla). |
 | `start_game` | cliente → servidor | — | El host arranca la partida. |
 | `game_starting` | servidor → cliente | `roomCode` | La partida empieza. |
-| `game_state` | servidor → cliente | `roomCode`, `phase`, `round`, `deadline`, `nightStep`, `role`, `loverId`, `vision`, `witchVictim`, `pendingKnight`, `ready`, `statuses` | Estado personalizado: tu rol privado y el estado público. |
+| `game_state` | servidor → cliente | `roomCode`, `phase`, `round`, `deadline`, `nightStep`, `role`, `loverId`, `vision`, `witchVictim`, `pendingKnight`, `myVote`, `hasVoted`, `runoffCandidates`, `lastVoteRound`, `lastVoteRunoffNeeded`, `lastVoteLynchedId`, `lastVoteTied`, `lastVoteAbstentions`, `lastVoteCounts`, `ready`, `statuses` | Estado personalizado: tu rol privado, tu voto y el estado público. |
 | `game_dawn` | servidor → cliente | `roomCode`, `died`, `lostLife`, `healed`, `quiet` | Parte del amanecer. |
 | `game_over` | servidor → cliente | `roomCode`, `outcome` | Fin de la partida. |
 | `game_action` | cliente → servidor | `action`, `kind`, `targetId`, `secondTargetId` | Acción de partida (voto, noche, listo…). |
@@ -276,7 +276,10 @@ emite `game_starting` a todos. Solo el host puede cambiar la configuración o em
 
 - Cada jugador recibe un **`game_state` personalizado** con la fase, la ronda, el plazo
   (`deadline` en milisegundos), su **rol privado**, su enamorado si lo tiene, la visión del Vidente,
-  la víctima que ve la Bruja, el Caballero pendiente y el estado público de todos.
+  la víctima que ve la Bruja, el Caballero pendiente, **su propio voto** (`myVote`/`hasVoted`),
+  los candidatos de la segunda vuelta y el estado público de todos.
+- Al cerrar una votación, el mismo `game_state` incluye el recuento (`lastVoteCounts`), el
+  linchado, los empatados y las abstenciones. Los votos individuales de los demás nunca se envían.
 - Los cambios de fase los difunde el ticker del servidor. Los clientes no avanzan nada por su cuenta.
 - Las acciones viajan en `game_action`:
   - `president_vote` y `vote`: `targetId` (vacío = abstención).
