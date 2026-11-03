@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { GameDawnMessage, GameOverMessage, GameSettings, GameStateMessage, Player } from '../protocol'
+import type {
+  GameAnnouncementMessage,
+  GameDawnMessage,
+  GameOverMessage,
+  GameSettings,
+  GameStateMessage,
+  Player,
+} from '../protocol'
 import { LupusSocket } from '../ws/socket'
 import type { SocketStatus } from '../ws/socket'
 import { SessionContext } from './context'
@@ -39,6 +46,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [players, setPlayers] = useState<Player[]>([])
   const [settings, setSettings] = useState<GameSettings | null>(null)
   const [game, setGame] = useState<GameStateMessage | null>(null)
+  const [announcements, setAnnouncements] = useState<GameAnnouncementMessage[]>([])
   const [dawn, setDawn] = useState<GameDawnMessage | null>(null)
   const [gameOver, setGameOver] = useState<GameOverMessage | null>(null)
   const [starting, setStarting] = useState(false)
@@ -61,6 +69,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setPlayers([])
     setSettings(null)
     setGame(null)
+    setAnnouncements([])
     setDawn(null)
     setGameOver(null)
     setStarting(false)
@@ -155,10 +164,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             case 'game_starting':
               setStarting(true)
               setReturnedToLobby(false)
+              setAnnouncements([])
               break
             case 'game_state':
               setGame(message)
               setStarting(false)
+              break
+            case 'game_announcement':
+              setAnnouncements((previous) => [...previous, message].slice(-50))
               break
             case 'game_dawn':
               setDawn(message)
@@ -168,6 +181,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
               break
             case 'returned_to_lobby':
               setGame(null)
+              setAnnouncements([])
               setDawn(null)
               setGameOver(null)
               setStarting(false)
@@ -295,6 +309,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       players,
       settings,
       game,
+      announcements,
       dawn,
       gameOver,
       starting,
@@ -320,6 +335,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       players,
       settings,
       game,
+      announcements,
       dawn,
       gameOver,
       starting,

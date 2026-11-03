@@ -1,5 +1,6 @@
 import { createContext } from 'react'
 import type {
+  GameAnnouncementMessage,
   GameDawnMessage,
   GameOverMessage,
   GameSettings,
@@ -22,6 +23,7 @@ export interface SessionValue {
   players: Player[]
   settings: GameSettings | null
   game: GameStateMessage | null
+  announcements: GameAnnouncementMessage[]
   dawn: GameDawnMessage | null
   gameOver: GameOverMessage | null
   starting: boolean

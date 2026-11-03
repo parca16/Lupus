@@ -14,6 +14,7 @@ function renderHome(overrides: Partial<SessionValue> = {}) {
     players: [],
     settings: null,
     game: null,
+    announcements: [],
     dawn: null,
     gameOver: null,
     starting: false,

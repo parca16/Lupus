@@ -54,12 +54,14 @@ public class GameTicker {
 				continue;
 			}
 
-			if (game.dawnReport() != null && dawnSent.add(dawnKey)) {
-				broadcaster.broadcastDawn(game, game.dawnReport());
-			}
-
 			if (game.phase() != before) {
 				broadcaster.broadcastState(game);
+				broadcaster.broadcastPhase(game);
+			}
+
+			if (game.dawnReport() != null && dawnSent.add(dawnKey)) {
+				broadcaster.broadcastDawn(game, game.dawnReport());
+				broadcaster.broadcastDawnAnnouncements(game, game.dawnReport());
 			}
 		}
 	}
