@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { AnnouncementFeed } from '../components/AnnouncementFeed'
+import { ChatPanel } from '../components/ChatPanel'
 import { GameOverPanel } from '../components/GameOverPanel'
 import { NightActionPanel } from '../components/NightActionPanel'
 import { RolePanel } from '../components/RolePanel'
@@ -313,6 +314,8 @@ export function GameScreen() {
           ))}
         </ul>
       </Card>
+
+      <ChatPanel />
 
       {game.vision || game.witchVictim ? (
         <Card>

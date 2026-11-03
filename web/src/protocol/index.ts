@@ -191,6 +191,22 @@ export interface ReturnedToLobbyMessage extends Envelope<'returned_to_lobby'> {
   roomCode: string
 }
 
+/** Mensaje de chat enviado por un jugador. */
+export interface ChatSendMessage extends Envelope<'chat_send'> {
+  channel: string
+  text: string
+}
+
+/** Mensaje de chat entregado a los jugadores de un canal. */
+export interface ChatMessage extends Envelope<'chat_message'> {
+  roomCode: string
+  channel: string
+  senderId: string
+  senderNickname: string
+  text: string
+  round: number
+}
+
 export interface GameActionMessage extends Envelope<'game_action'> {
   action: string
   kind: string
@@ -224,6 +240,8 @@ export type Message =
   | GameAnnouncementMessage
   | GameDawnMessage
   | GameOverMessage
+  | ChatSendMessage
+  | ChatMessage
   | GameActionMessage
 
 export type MessageType = Message['type']
@@ -308,6 +326,15 @@ export const MESSAGE_FIELDS: Record<MessageType, Record<string, FieldKind>> = {
   game_announcement: { roomCode: 'string', round: 'number', kind: 'string', text: 'string' },
   game_over: { roomCode: 'string', outcome: 'string', roles: 'array' },
   game_action: { action: 'string', kind: 'string', targetId: 'string', secondTargetId: 'string' },
+  chat_send: { channel: 'string', text: 'string' },
+  chat_message: {
+    roomCode: 'string',
+    channel: 'string',
+    senderId: 'string',
+    senderNickname: 'string',
+    text: 'string',
+    round: 'number',
+  },
 }
 
 export const MESSAGE_TYPES = Object.keys(MESSAGE_FIELDS) as MessageType[]

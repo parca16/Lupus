@@ -1,5 +1,6 @@
 import { createContext } from 'react'
 import type {
+  ChatMessage,
   GameAnnouncementMessage,
   GameDawnMessage,
   GameOverMessage,
@@ -24,6 +25,7 @@ export interface SessionValue {
   settings: GameSettings | null
   game: GameStateMessage | null
   announcements: GameAnnouncementMessage[]
+  chatMessages: ChatMessage[]
   dawn: GameDawnMessage | null
   gameOver: GameOverMessage | null
   starting: boolean
@@ -37,6 +39,7 @@ export interface SessionValue {
   updateSettings: (settings: GameSettings) => void
   startGame: () => void
   returnToLobby: () => void
+  sendChat: (channel: string, text: string) => void
   gameAction: (action: string, options?: GameActionOptions) => void
   leave: () => void
   clearError: () => void

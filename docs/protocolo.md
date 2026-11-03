@@ -60,6 +60,8 @@ Ejemplo:
 | `game_dawn` | servidor → cliente | `roomCode`, `died`, `lostLife`, `healed`, `quiet` | Parte del amanecer. |
 | `game_over` | servidor → cliente | `roomCode`, `outcome`, `roles` | Fin de la partida y roles revelados. |
 | `game_action` | cliente → servidor | `action`, `kind`, `targetId`, `secondTargetId` | Acción de partida (voto, noche, listo…). |
+| `chat_send` | cliente → servidor | `channel`, `text` | Mensaje a `public`, `wolves` o `lovers` si la fase lo permite. |
+| `chat_message` | servidor → cliente | `roomCode`, `channel`, `senderId`, `senderNickname`, `text`, `round` | Mensaje entregado solo a los jugadores del canal. |
 
 El objeto `Player` que viaja dentro de `players` tiene esta forma:
 
@@ -297,6 +299,11 @@ emite `game_starting` a todos. Solo el host puede cambiar la configuración o em
   lista de roles revelados.
 - Tras el final, el host puede enviar `return_to_lobby` para volver a la configuración sin arrancar
   otra partida; el servidor responde con `returned_to_lobby` a todos los jugadores.
+- **Chat**: `chat_send` elige canal (`public`, `wolves`, `lovers`). El servidor valida fase, rol y
+  estado; los mensajes salen como `chat_message` solo a los miembros del canal.
+  - `public`: jugadores vivos durante debate, votación y segunda vuelta.
+  - `wolves`: lobos vivos durante la noche.
+  - `lovers`: la pareja de enamorados, siempre que ambos sigan vivos.
 - Con la partida en curso no se puede salir ni expulsar (`game_already_started`): solo desconectarse,
   que conserva el asiento.
 

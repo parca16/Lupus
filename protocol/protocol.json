@@ -487,6 +487,46 @@
         "targetId": "00000000-0000-0000-0000-0000000000cc",
         "secondTargetId": ""
       }
+    },
+    "chat_send": {
+      "direction": "c2s",
+      "summary": "Mensaje de chat a un canal permitido por la fase y el estado del jugador.",
+      "fields": {
+        "channel": "string",
+        "text": "string"
+      },
+      "example": {
+        "v": 1,
+        "type": "chat_send",
+        "id": "00000000-0000-0000-0000-000000000026",
+        "at": 1700000001850,
+        "channel": "public",
+        "text": "Yo voto a Luis."
+      }
+    },
+    "chat_message": {
+      "direction": "s2c",
+      "summary": "Mensaje de chat entregado a los jugadores del canal.",
+      "fields": {
+        "roomCode": "string",
+        "channel": "string",
+        "senderId": "string",
+        "senderNickname": "string",
+        "text": "string",
+        "round": "number"
+      },
+      "example": {
+        "v": 1,
+        "type": "chat_message",
+        "id": "00000000-0000-0000-0000-000000000027",
+        "at": 1700000001860,
+        "roomCode": "ABC234",
+        "channel": "public",
+        "senderId": "00000000-0000-0000-0000-0000000000bb",
+        "senderNickname": "Ana",
+        "text": "Yo voto a Luis.",
+        "round": 1
+      }
     }
   }
 }
