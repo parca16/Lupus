@@ -42,6 +42,8 @@ import com.parca16.lupus.protocol.Ping;
 import com.parca16.lupus.protocol.Pong;
 import com.parca16.lupus.protocol.Protocol;
 import com.parca16.lupus.protocol.ResumeRoom;
+import com.parca16.lupus.protocol.ReturnToLobby;
+import com.parca16.lupus.protocol.ReturnedToLobby;
 import com.parca16.lupus.protocol.RoomSettings;
 import com.parca16.lupus.protocol.RoomState;
 import com.parca16.lupus.protocol.StartGame;
@@ -176,6 +178,7 @@ public class LupusWebSocketHandler extends TextWebSocketHandler {
 			case KickPlayer kickPlayer -> expulsar(session, kickPlayer);
 			case UpdateSettings updateSettings -> actualizarConfiguracion(session, updateSettings);
 			case StartGame ignored -> empezarPartida(session);
+			case ReturnToLobby ignored -> volverAlLobby(session);
 			case GameAction gameAction -> ejecutarAccion(session, gameAction);
 			default -> sendError(session, "unknown_type", "Mensaje no admitido del cliente.");
 		}
@@ -242,6 +245,10 @@ public class LupusWebSocketHandler extends TextWebSocketHandler {
 		if (!room.isHost(jugadorActual(session))) {
 			throw new RoomException(RoomException.NOT_HOST, "Solo el host puede empezar la partida.");
 		}
+		if (room.state() == GameState.FINISHED) {
+			throw new RoomException(RoomException.GAME_NOT_FINISHED,
+					"Vuelve a la configuracion antes de empezar otra partida.");
+		}
 		if (games.find(room.code()).isPresent()) {
 			throw new RoomException(RoomException.GAME_ALREADY_STARTED, "La partida ya ha empezado.");
 		}
@@ -261,6 +268,24 @@ public class LupusWebSocketHandler extends TextWebSocketHandler {
 		notifier.broadcastAll(room, new GameStarting(Protocol.VERSION, UUID.randomUUID().toString(),
 				System.currentTimeMillis(), room.code()));
 		broadcaster.broadcastState(game);
+	}
+
+	/** Vuelve a la configuracion conservando a los jugadores, sin arrancar otra partida (#60). */
+	private void volverAlLobby(WebSocketSession session) {
+		Room room = salaActual(session);
+
+		if (!room.isHost(jugadorActual(session))) {
+			throw new RoomException(RoomException.NOT_HOST,
+					"Solo el host puede volver a la configuracion.");
+		}
+		if (room.state() != GameState.FINISHED) {
+			throw new RoomException(RoomException.GAME_NOT_FINISHED,
+					"La partida todavia no ha terminado.");
+		}
+
+		room.state(GameState.WAITING);
+		notifier.broadcastAll(room, new ReturnedToLobby(Protocol.VERSION, UUID.randomUUID().toString(),
+				System.currentTimeMillis(), room.code()));
 	}
 
 	private void salirDeSala(WebSocketSession session) {

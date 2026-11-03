@@ -164,9 +164,23 @@ export interface GameDawnMessage extends Envelope<'game_dawn'> {
   quiet: boolean
 }
 
+/** Rol revelado al terminar la partida. */
+export interface GameRole {
+  playerId: string
+  nickname: string
+  role: string
+}
+
 export interface GameOverMessage extends Envelope<'game_over'> {
   roomCode: string
   outcome: string
+  roles: GameRole[]
+}
+
+export interface ReturnToLobbyMessage extends Envelope<'return_to_lobby'> {}
+
+export interface ReturnedToLobbyMessage extends Envelope<'returned_to_lobby'> {
+  roomCode: string
 }
 
 export interface GameActionMessage extends Envelope<'game_action'> {
@@ -195,6 +209,8 @@ export type Message =
   | UpdateSettingsMessage
   | RoomSettingsMessage
   | StartGameMessage
+  | ReturnToLobbyMessage
+  | ReturnedToLobbyMessage
   | GameStartingMessage
   | GameStateMessage
   | GameDawnMessage
@@ -247,6 +263,8 @@ export const MESSAGE_FIELDS: Record<MessageType, Record<string, FieldKind>> = {
     showVoteDetail: 'boolean',
   },
   start_game: {},
+  return_to_lobby: {},
+  returned_to_lobby: { roomCode: 'string' },
   game_starting: { roomCode: 'string' },
   game_state: {
     roomCode: 'string',
@@ -278,7 +296,7 @@ export const MESSAGE_FIELDS: Record<MessageType, Record<string, FieldKind>> = {
     healed: 'array',
     quiet: 'boolean',
   },
-  game_over: { roomCode: 'string', outcome: 'string' },
+  game_over: { roomCode: 'string', outcome: 'string', roles: 'array' },
   game_action: { action: 'string', kind: 'string', targetId: 'string', secondTargetId: 'string' },
 }
 
@@ -342,6 +360,15 @@ export function isGameVoteCount(value: unknown): value is GameVoteCount {
   )
 }
 
+export function isGameRole(value: unknown): value is GameRole {
+  return (
+    isRecord(value) &&
+    typeof value.playerId === 'string' &&
+    typeof value.nickname === 'string' &&
+    typeof value.role === 'string'
+  )
+}
+
 function matchesKind(value: unknown, kind: FieldKind): boolean {
   if (kind === 'array') {
     return Array.isArray(value)
@@ -380,7 +407,7 @@ export function isMessage(value: unknown): value is Message {
     return false
   }
 
-  if ('roles' in value) {
+  if ((value.type === 'update_settings' || value.type === 'room_settings') && 'roles' in value) {
     const roles = value.roles as unknown[]
     if (!roles.every((role) => typeof role === 'string' && (ROLES as readonly string[]).includes(role))) {
       return false
@@ -392,6 +419,10 @@ export function isMessage(value: unknown): value is Message {
   }
 
   if ('lastVoteCounts' in value && !(value.lastVoteCounts as unknown[]).every(isGameVoteCount)) {
+    return false
+  }
+
+  if (value.type === 'game_over' && !(value.roles as unknown[]).every(isGameRole)) {
     return false
   }
 

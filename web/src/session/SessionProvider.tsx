@@ -43,6 +43,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [gameOver, setGameOver] = useState<GameOverMessage | null>(null)
   const [starting, setStarting] = useState(false)
   const [restoring, setRestoring] = useState(false)
+  const [returnedToLobby, setReturnedToLobby] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
 
@@ -64,6 +65,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setGameOver(null)
     setStarting(false)
     setRestoring(false)
+    setReturnedToLobby(false)
   }, [])
 
   const start = useCallback(
@@ -131,6 +133,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
               saveSession(seated)
               resumingRef.current = false
               setRestoring(false)
+              setReturnedToLobby(false)
               setNotice(null)
               break
             }
@@ -151,6 +154,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
               break
             case 'game_starting':
               setStarting(true)
+              setReturnedToLobby(false)
               break
             case 'game_state':
               setGame(message)
@@ -161,6 +165,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
               break
             case 'game_over':
               setGameOver(message)
+              break
+            case 'returned_to_lobby':
+              setGame(null)
+              setDawn(null)
+              setGameOver(null)
+              setStarting(false)
+              setReturnedToLobby(true)
               break
             case 'error': {
               const recuperando = resumingRef.current
@@ -244,6 +255,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     socketRef.current?.send('start_game', {})
   }, [])
 
+  const returnToLobby = useCallback(() => {
+    socketRef.current?.send('return_to_lobby', {})
+  }, [])
+
   const gameAction = useCallback((action: string, options: GameActionOptions = {}) => {
     socketRef.current?.send('game_action', {
       action,
@@ -284,6 +299,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       gameOver,
       starting,
       restoring,
+      returnedToLobby,
       error,
       notice,
       createRoom,
@@ -291,6 +307,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       kickPlayer,
       updateSettings,
       startGame,
+      returnToLobby,
       gameAction,
       leave,
       clearError,
@@ -307,6 +324,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       gameOver,
       starting,
       restoring,
+      returnedToLobby,
       error,
       notice,
       createRoom,
@@ -314,6 +332,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       kickPlayer,
       updateSettings,
       startGame,
+      returnToLobby,
       gameAction,
       leave,
       clearError,

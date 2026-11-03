@@ -52,10 +52,12 @@ Ejemplo:
 | `update_settings` | cliente → servidor | `wolves`, `roles`, `lives`, `president`, `debateSeconds`, `roleSeconds`, `voteSeconds`, `showVoteDetail` | El host cambia la configuración. |
 | `room_settings` | servidor → cliente | `roomCode` + los mismos campos | Configuración vigente (al crear, al entrar y al cambiarla). |
 | `start_game` | cliente → servidor | — | El host arranca la partida. |
+| `return_to_lobby` | cliente → servidor | — | El host vuelve a la configuración con los mismos jugadores. |
+| `returned_to_lobby` | servidor → cliente | `roomCode` | La sala ha vuelto al lobby; la partida terminada se descarta. |
 | `game_starting` | servidor → cliente | `roomCode` | La partida empieza. |
 | `game_state` | servidor → cliente | `roomCode`, `phase`, `round`, `deadline`, `nightStep`, `role`, `loverId`, `vision`, `witchVictim`, `pendingKnight`, `myVote`, `hasVoted`, `runoffCandidates`, `lastVoteRound`, `lastVoteRunoffNeeded`, `lastVoteLynchedId`, `lastVoteTied`, `lastVoteAbstentions`, `lastVoteCounts`, `ready`, `statuses` | Estado personalizado: tu rol privado, tu voto y el estado público. |
 | `game_dawn` | servidor → cliente | `roomCode`, `died`, `lostLife`, `healed`, `quiet` | Parte del amanecer. |
-| `game_over` | servidor → cliente | `roomCode`, `outcome` | Fin de la partida. |
+| `game_over` | servidor → cliente | `roomCode`, `outcome`, `roles` | Fin de la partida y roles revelados. |
 | `game_action` | cliente → servidor | `action`, `kind`, `targetId`, `secondTargetId` | Acción de partida (voto, noche, listo…). |
 
 El objeto `Player` que viaja dentro de `players` tiene esta forma:
@@ -288,7 +290,10 @@ emite `game_starting` a todos. Solo el host puede cambiar la configuración o em
   - `night_action` + `kind`: `seer`, `guardian`, `wolf_vote`, `witch_heal`, `witch_poison`,
     `witch_none` o `cupid` (con `targetId` y `secondTargetId`).
 - Al amanecer se envía `game_dawn` con las muertes, vidas perdidas y curaciones.
-- Al terminar se envía `game_over` con el bando ganador (`VILLAGE`, `WOLVES` o `LOVERS`).
+- Al terminar se envía `game_over` con el bando ganador (`VILLAGE`, `WOLVES` o `LOVERS`) y la
+  lista de roles revelados.
+- Tras el final, el host puede enviar `return_to_lobby` para volver a la configuración sin arrancar
+  otra partida; el servidor responde con `returned_to_lobby` a todos los jugadores.
 - Con la partida en curso no se puede salir ni expulsar (`game_already_started`): solo desconectarse,
   que conserva el asiento.
 
