@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: lupus-server
+    runtime: docker
+    plan: free
+    rootDir: server
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /actuator/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: LUPUS_RATE_MAX_MESSAGES
+        value: "60"
+      - key: LUPUS_RATE_WINDOW_MILLIS
+        value: "10000"
